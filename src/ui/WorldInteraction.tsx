@@ -15,6 +15,8 @@ export function WorldInteraction() {
   const config = object.obstacleType ? BALANCE.obstacles[object.obstacleType] : null;
   const progress = data.exploration.obstacles[object.id]?.hits ?? 0;
   const berries = object.id === 'meadow-berries';
+  const actionable = Boolean(config || berries || object.id === 'old-gate');
+  if (!actionable) return null;
   const reward = config ? Object.entries(config.rewards).map(([key, amount]) => `${amount} ${RESOURCES[key as ResourceId].plural}`).join(' · ') : '';
   return <aside className="world-interaction" style={{left:`clamp(145px, ${anchor.x}px, calc(100vw - 145px))`,top:`clamp(66px, ${anchor.y-155}px, calc(100dvh - 175px))`}} aria-label="Interação com o mundo">
     <div className="interaction-title"><strong>{object.interaction.name}</strong><button className="icon-button" aria-label="Fechar identificação" onClick={()=>actions.selectObject(null)}><Icon name="close" size={14}/></button></div>
