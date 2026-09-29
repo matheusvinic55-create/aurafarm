@@ -1,4 +1,4 @@
-# AuraFarm — Etapa 04
+# AuraFarm — Etapa 05
 
 Jogo cozy independente para iPhone/PWA. Este repositório nasce do zero e não compartilha código, dados, credenciais ou infraestrutura com outros aplicativos.
 
@@ -88,9 +88,14 @@ Repositório existente: `matheusvinic55-create/aurafarm`, branch `main`. Projeto
 
 `vercel.json` contém os parâmetros de build e evita cache duradouro do service worker. A integração Git da Vercel deve criar os deployments posteriores a cada push em `main`. O lockfile deve acompanhar todo commit que altera dependências.
 
-## Próximas etapas (não implementadas)
+## Etapa 05 — missões, progressão, personagens e narrativa
 
-5. Missões, progressão completa, personagens e narrativa.
+A Clareira do Amanhecer agora tem três moradores — Lia, Bento e Nina — com presença física no mapa e diálogos próprios. O diário de Jornada reúne seis missões principais e duas descobertas opcionais, sem prazo ou punição. Objetivos usam eventos reais do save: visitas, colheitas, produção, inventário e conversas. Recompensas são reivindicadas uma única vez e concedem XP, moedas e itens.
+
+A progressão usa o sistema existente de nível e XP. Estado narrativo e conversas ficam em `characters`, missões em `quests`; a sincronização é idempotente e não duplica recompensas. Conversar, cultivar e produzir continuam sem custo de energia.
+
+## Próxima etapa (não implementada)
+
 6. Animações, áudio, efeitos, eventos, equilíbrio e polimento.
 
 Regra permanente: **“Energia controla o ritmo da exploração; não controla o direito de jogar.”** Cuidar da fazenda, produzir, decorar e conversar devem continuar disponíveis sem energia. Não há monetização nem mecanismos de escassez artificial.
