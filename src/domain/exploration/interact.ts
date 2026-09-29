@@ -11,7 +11,10 @@ export function interact(data: SaveData, id: string, now: number, random = Math.
   const object = findWorldObject(id);
   if (!object?.interaction || !objectPresent(object, data)) return { error: 'Esse trecho já está livre.' };
   const approach = object.interaction.approach;
-  if (Math.hypot(data.player.position.x - approach.x, data.player.position.y - approach.y) > BALANCE.interactionRange) return { error: 'Chegue um pouquinho mais perto.' };
+  const toApproach = Math.hypot(data.player.position.x - approach.x, data.player.position.y - approach.y);
+  const toObject = Math.hypot(data.player.position.x - object.x, data.player.position.y - object.y);
+  // Some action points sit in unreachable spots; the character stops at the nearest walkable cell, so also accept being close to the object.
+  if (toApproach > BALANCE.interactionRange && toObject > BALANCE.objectReach) return { error: 'Chegue um pouquinho mais perto.' };
   const before = regenerate(data.energy, now);
   data.energy = before;
   const rewards: Partial<Record<ResourceId, number>> = {};
