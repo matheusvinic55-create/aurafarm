@@ -20,8 +20,8 @@ import { characterById } from '../domain/characters/catalog';
 type Panel = 'inventory' | 'settings' | 'help' | 'energy' | 'quests' | null;
 
 export function App() {
-  const state = useStore(gameStore, useShallow(({data,ready,fatal,selectedId,saveStatus,notice,noticeId,zoneName,feedback})=>({data,ready,fatal,selectedId,saveStatus,notice,noticeId,zoneName,feedback})));
-  const { data, ready, fatal, saveStatus, notice, noticeId, zoneName } = state;
+  const state = useStore(gameStore, useShallow(({data,ready,fatal,selectedId,saveStatus,notice,noticeId,feedback})=>({data,ready,fatal,selectedId,saveStatus,notice,noticeId ,feedback})));
+  const { data, ready, fatal, saveStatus, notice, noticeId } = state;
   const [panel, setPanel] = useState<Panel>(null);
   const [now, setNow] = useState(Date.now());
   const [devTaps, setDevTaps] = useState(0);
