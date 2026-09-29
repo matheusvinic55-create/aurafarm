@@ -30,6 +30,7 @@ export class MeadowScene extends Phaser.Scene {
   private motes: Phaser.GameObjects.Arc[] = [];
   private selected: string | null = null;
   private pendingAction: string | null = null;
+  private gesture = { dragging: false, lastX: 0, lastY: 0, pinchDistance: 0 };
   private hide = () => { if (document.hidden) this.checkpoint(); };
   private pageHide = () => this.checkpoint();
   constructor() { super('meadow'); }
@@ -61,13 +62,41 @@ export class MeadowScene extends Phaser.Scene {
     this.ring = this.add.ellipse(0,0,90,36).setStrokeStyle(3,0xfff1bb,.95).setVisible(false);
     this.destination = this.add.ellipse(0,0,23,12).setStrokeStyle(2,0xfff5cb,.85).setVisible(false).setDepth(-1);
     for(let i=0;i<7;i++) this.motes.push(this.add.circle(0,0,2,0xfff3b8,.7).setDepth(3000));
+    // One finger pans the world; two fingers pinch to zoom. Add a second touch pointer explicitly.
+    this.input.addPointer(1);
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      this.gesture.lastX = pointer.x; this.gesture.lastY = pointer.y;
+      const active = this.input.manager.pointers.filter(p => p.isDown);
+      if (active.length >= 2) this.gesture.pinchDistance = Phaser.Math.Distance.Between(active[0].x, active[0].y, active[1].x, active[1].y);
+    });
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!pointer.isDown || document.querySelector('dialog[open]')) return;
+      const active = this.input.manager.pointers.filter(p => p.isDown);
+      if (active.length >= 2) {
+        const distance = Phaser.Math.Distance.Between(active[0].x, active[0].y, active[1].x, active[1].y);
+        if (this.gesture.pinchDistance > 0 && distance > 0) {
+          this.worldCamera.zoomBy(distance / this.gesture.pinchDistance);
+          this.gesture.dragging = true;
+        }
+        this.gesture.pinchDistance = distance;
+        return;
+      }
+      const dx = pointer.x - this.gesture.lastX, dy = pointer.y - this.gesture.lastY;
+      if (pointer.getDistance() > 12) {
+        this.worldCamera.panByScreen(dx, dy);
+        this.gesture.dragging = true;
+      }
+      this.gesture.lastX = pointer.x; this.gesture.lastY = pointer.y;
+    });
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
-      if(over.length || pointer.getDistance()>15 || document.querySelector('dialog[open]')) return;
+      const wasGesture = this.gesture.dragging || pointer.getDistance() > 15;
+      if (!this.input.manager.pointers.some(p => p.isDown)) { this.gesture.dragging = false; this.gesture.pinchDistance = 0; }
+      if(over.length || wasGesture || document.querySelector('dialog[open]')) return;
       const p = this.cameras.main.getWorldPoint(pointer.x,pointer.y);
       if(!this.navigation.isWalkable(p)) { gameBridge.notify('Esse trecho ainda está fechado. Siga pela clareira ou limpe os obstáculos.'); return; }
       const route = this.navigation.findPath(this.explorer.position,p);
       if(!route) { gameBridge.notify('Ainda não há passagem até ali.'); return; }
-      gameBridge.select(null); this.pendingAction=null; this.beginRoute(route,p);
+      gameBridge.select(null); this.pendingAction=null; this.worldCamera.resumeFollow(); this.beginRoute(route,p);
     });
     this.unsubscribe = gameBridge.subscribe((next, previous) => {
       if (navigationKey(next.data)!==navigationKey(previous.data)) {
