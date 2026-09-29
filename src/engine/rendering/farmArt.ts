@@ -74,7 +74,7 @@ export class FarmLayer {
       const soil = scene.add.image(plot.x, plot.y, 'farm-soil-empty').setOrigin(.5, 75 / 110).setDepth(-.5);
       const crop = scene.add.image(plot.x, plot.y, 'farm-wheat-seed').setOrigin(.5, 75 / 110).setDepth(plot.y).setVisible(false);
       const badge = scene.add.ellipse(plot.x, plot.y + 4, 110, 55).setStrokeStyle(2, 0xf6e8a3, .8).setDepth(-.4).setVisible(false);
-      const hit = scene.add.zone(plot.x, plot.y, 108, 80).setDepth(plot.y + 1).setInteractive();
+      const hit = scene.add.zone(plot.x, plot.y, 88, 64).setDepth(plot.y + 1).setInteractive();
       hit.on('pointerup', (pointer: Phaser.Input.Pointer) => { onTap(plot.id, pointer); });
       this.plots.set(plot.id, { soil, crop, badge, key: '' });
     }
@@ -82,7 +82,7 @@ export class FarmLayer {
     const image = scene.add.image(station.x, station.y, 'farm-kitchen').setOrigin(.5, 156 / 178).setDepth(station.y).setInteractive();
     image.on('pointerup', (pointer: Phaser.Input.Pointer) => { onTap(station.id, pointer); });
     this.stationBadge = scene.add.text(station.x, station.y - 155, 'COZINHA', { fontFamily: '-apple-system,sans-serif', fontSize: '12px', color: '#526547', backgroundColor: '#f9efd5', padding: { x: 8, y: 5 } }).setOrigin(.5).setDepth(station.y + 1);
-    scene.add.text(1012, 1670, 'HORTA DO JARDIM', { fontFamily: 'Georgia', fontSize: '13px', color: '#f4efd3', stroke: '#6b8050', strokeThickness: 3 }).setOrigin(.5).setDepth(1);
+    scene.add.text(PLOTS[4].x, PLOTS[4].y + 145, 'HORTA DO JARDIM', { fontFamily: 'Georgia', fontSize: '13px', color: '#f4efd3', stroke: '#6b8050', strokeThickness: 3 }).setOrigin(.5).setDepth(1);
   }
   refresh(data: SaveData, now: number) {
     for (const plot of PLOTS) {
