@@ -1,5 +1,8 @@
 import type { SceneryObject, WorldDefinition } from './types';
-const point=(x:number,y:number)=>({x,y});
+const WORLD_SCALE = 1.28;
+const WORLD_CENTER = 1200;
+const spread = (value:number) => WORLD_CENTER + (value - WORLD_CENTER) * WORLD_SCALE;
+const point=(x:number,y:number)=>({x:spread(x),y:spread(y)});
 const objects:SceneryObject[]=[
 {id:'home',kind:'cabin',x:900,y:1210,scale:1,solid:{type:'rect',x:780,y:1075,width:234,height:132},interaction:{name:'Casa do Ipê',description:'Madeira antiga, janelas abertas e espaço para um novo começo.',approach:point(960,1300)}},
 {id:'welcome-sign',kind:'sign',x:1180,y:1580,scale:1,solid:{type:'ellipse',x:1180,y:1580,radiusX:23,radiusY:14},interaction:{name:'Clareira do Amanhecer',description:'A casa fica a oeste. O lago, a leste. Vá pelo caminho que chamar você.',approach:point(1224,1644)}},
@@ -43,8 +46,27 @@ objects.push(
 for(let i=objects.length-1;i>=0;i--)if(objects[i].id.startsWith('forest-')&&objects[i].x>920&&objects[i].x<1450&&objects[i].y<670)objects.splice(i,1);
 const gate=objects.find(o=>o.id==='old-gate')!;
 gate.interaction!.description='Limpe os galhos, o tronco e as samambaias da trilha para abrir este caminho.';
+// Give the existing world more breathing room while preserving every stable object ID and gameplay system.
+for (const object of objects) {
+  object.x = spread(object.x);
+  object.y = spread(object.y);
+  if (object.solid) {
+    object.solid.x = spread(object.solid.x);
+    object.solid.y = spread(object.solid.y);
+  }
+}
 export const TRAIL_BLOCKERS=['trail-branches','trail-log','trail-thicket'];
-export const MEADOW:WorldDefinition={id:'first-meadow',revision:4,name:'Clareira do Amanhecer',width:2400,height:2400,spawn:point(1128,1368),boundary:[[520,960],[680,710],[970,480],[940,200],[1390,200],[1420,510],[1670,720],[1760,1060],[1960,1170],[1930,1450],[1800,1650],[1710,1930],[1370,2090],[930,2000],[630,1770],[510,1390]].map(([x,y])=>point(x,y)),blockedAreas:[{id:'country-kitchen',type:'rect',x:825,y:1318,width:100,height:42},{type:'ellipse',x:1595,y:1635,radiusX:143,radiusY:206},{id:'fern-entrance',type:'rect',x:970,y:460,width:420,height:175},{type:'rect',x:1840,y:1130,width:400,height:240},{type:'rect',x:687,y:1274,width:110,height:14},{type:'rect',x:1070,y:1274,width:170,height:14}],objects,paths:[[[1170,590],[1140,500],[1170,400],[1160,270]],[[1190,2030],[1190,1830],[1170,1620],[1120,1450],[1050,1320],[930,1230]],[[1120,1450],[1180,1240],[1180,970],[1150,790],[1170,590]],[[1180,1240],[1430,1330],[1640,1320],[1910,1270]],[[1170,1620],[1310,1740],[1430,1810],[1540,1890]],[[1050,1320],[850,1400],[800,1580],[950,1780],[1190,1830]]].map(path=>path.map(([x,y])=>point(x,y))),zones:[{name:'Recanto das Samambaias',bounds:{type:'rect',x:900,y:150,width:550,height:490}},{name:'Trilha das Samambaias',bounds:{type:'rect',x:600,y:350,width:1200,height:570}},{name:'Margem do Riacho',bounds:{type:'rect',x:1550,y:900,width:600,height:540}},{name:'Lago das Libélulas',bounds:{type:'rect',x:1300,y:1450,width:600,height:620}},{name:'Jardim da Casa',bounds:{type:'rect',x:540,y:930,width:510,height:550}}]};
+export const MEADOW:WorldDefinition={id:'first-meadow',revision:5,name:'Clareira do Amanhecer',width:3072,height:3072,spawn:point(1128,1368),boundary:[[520,960],[680,710],[970,480],[940,200],[1390,200],[1420,510],[1670,720],[1760,1060],[1960,1170],[1930,1450],[1800,1650],[1710,1930],[1370,2090],[930,2000],[630,1770],[510,1390]].map(([x,y])=>point(x,y)),blockedAreas:[{id:'country-kitchen',type:'rect',x:825,y:1318,width:100,height:42},{type:'ellipse',x:1595,y:1635,radiusX:143,radiusY:206},{id:'fern-entrance',type:'rect',x:970,y:460,width:420,height:175},{type:'rect',x:1840,y:1130,width:400,height:240},{type:'rect',x:687,y:1274,width:110,height:14},{type:'rect',x:1070,y:1274,width:170,height:14}],objects,paths:[[[1170,590],[1140,500],[1170,400],[1160,270]],[[1190,2030],[1190,1830],[1170,1620],[1120,1450],[1050,1320],[930,1230]],[[1120,1450],[1180,1240],[1180,970],[1150,790],[1170,590]],[[1180,1240],[1430,1330],[1640,1320],[1910,1270]],[[1170,1620],[1310,1740],[1430,1810],[1540,1890]],[[1050,1320],[850,1400],[800,1580],[950,1780],[1190,1830]]].map(path=>path.map(([x,y])=>point(x,y))),zones:[{name:'Recanto das Samambaias',bounds:{type:'rect',x:900,y:150,width:550,height:490}},{name:'Trilha das Samambaias',bounds:{type:'rect',x:600,y:350,width:1200,height:570}},{name:'Margem do Riacho',bounds:{type:'rect',x:1550,y:900,width:600,height:540}},{name:'Lago das Libélulas',bounds:{type:'rect',x:1300,y:1450,width:600,height:620}},{name:'Jardim da Casa',bounds:{type:'rect',x:540,y:930,width:510,height:550}}]};
+// The world definition still contains authored rectangles/ellipses in the original coordinate space.
+for (const area of MEADOW.blockedAreas) {
+  area.x = spread(area.x); area.y = spread(area.y);
+  if (area.type === 'rect') { area.width *= WORLD_SCALE; area.height *= WORLD_SCALE; }
+  else { area.radiusX *= WORLD_SCALE; area.radiusY *= WORLD_SCALE; }
+}
+for (const zone of MEADOW.zones) {
+  zone.bounds.x = spread(zone.bounds.x); zone.bounds.y = spread(zone.bounds.y);
+  zone.bounds.width *= WORLD_SCALE; zone.bounds.height *= WORLD_SCALE;
+}
 export const WORLD_OBJECTS=objects.filter(object=>object.interaction);
 export const findWorldObject=(id:string)=>objects.find(object=>object.id===id);
 export interface MapProgress{unlockedAreas:string[];visitedPlaces:string[]}
