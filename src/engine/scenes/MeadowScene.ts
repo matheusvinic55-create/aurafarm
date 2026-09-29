@@ -50,23 +50,19 @@ export class MeadowScene extends Phaser.Scene {
     for (const object of MEADOW.objects) {
       const spec = ART[object.kind];
       const image = this.add.image(object.x, object.y, `world-${object.kind}`).setOrigin(.5, spec.foot/spec.h).setScale(object.scale).setDepth(object.y);
-      if (object.interaction) {
+      if (object.interaction && !object.obstacleType) {
         image.setInteractive({ useHandCursor: true });
         image.on('pointerup', (pointer: Phaser.Input.Pointer) => {
           if (this.gesture.dragging || this.gesture.pinchDistance > 0 || pointer.getDistance()>15 || !objectPresent(object, gameBridge.snapshot().data)) return;
+          // Removable obstacles win over any overlapping scenery (tree canopies, bushes...).
+          if (this.obstacleAt(pointer)) return;
           const now = this.time.now;
           const doubleTap = this.lastObjectTap.id === object.id && now - this.lastObjectTap.at <= 360;
           this.lastObjectTap = { id: object.id, at: now };
           gameBridge.select(object.id);
-          // Removable obstacles are direct world actions: one tap walks over and clears/works them.
-          // This keeps decorative scenery passive while making every blocker obviously functional.
-          if (object.obstacleType || object.id === 'meadow-berries') {
-            if (!doubleTap && object.id === 'meadow-berries') return;
-            this.pendingAction = object.id;
-            const destination = this.navigation.safePosition(object.interaction!.approach);
-            const route = this.navigation.findPath(this.explorer.position, destination);
-            if (route) this.beginRoute(route, destination);
-            else { this.pendingAction = null; gameBridge.notify('Ainda não há passagem até ali.'); }
+          if (object.id === 'meadow-berries') {
+            if (!doubleTap) return;
+            this.walkAndAct(object.id, object.interaction!.approach);
           }
         });
       }
@@ -123,7 +119,10 @@ export class MeadowScene extends Phaser.Scene {
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
       const wasGesture = this.gesture.dragging || pointer.getDistance() > 15;
       if (![this.input.pointer1, this.input.pointer2].some(p => p?.isDown)) { this.gesture.dragging = false; this.gesture.pinchDistance = 0; }
-      if(over.length || wasGesture || document.querySelector('dialog[open]')) return;
+      if(wasGesture || document.querySelector('dialog[open]')) return;
+      const obstacle = this.obstacleAt(pointer);
+      if (obstacle) { this.tapObstacle(obstacle); return; }
+      if(over.length) return;
       const p = this.cameras.main.getWorldPoint(pointer.x,pointer.y);
       if(!this.navigation.isWalkable(p)) { gameBridge.notify('Esse trecho ainda está fechado. Siga pela clareira ou limpe os obstáculos.'); return; }
       const route = this.navigation.findPath(this.explorer.position,p);
@@ -173,6 +172,32 @@ export class MeadowScene extends Phaser.Scene {
     });
     this.farmLayer.refresh(gameBridge.snapshot().data, Date.now());
     this.resizeScene(); this.checkpoint();
+  }
+  /** Nearest present obstacle under the finger. Generous padding so small items are easy to hit on a phone. */
+  private obstacleAt(pointer: Phaser.Input.Pointer): SceneryObject | null {
+    const p = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+    const data = gameBridge.snapshot().data, pad = 26;
+    let best: SceneryObject | null = null, bestDistance = Infinity;
+    for (const { data: object, image } of this.scenery) {
+      if (!object.obstacleType || !object.interaction || !objectPresent(object, data) || !image.visible) continue;
+      const box = image.getBounds();
+      if (p.x < box.x - pad || p.x > box.right + pad || p.y < box.y - pad || p.y > box.bottom + pad) continue;
+      const distance = Math.hypot(p.x - box.centerX, p.y - box.centerY);
+      if (distance < bestDistance) { best = object; bestDistance = distance; }
+    }
+    return best;
+  }
+  private tapObstacle(object: SceneryObject) {
+    gameBridge.select(object.id);
+    this.walkAndAct(object.id, object.interaction!.approach);
+  }
+  /** Walk to the action point, then run the interaction (see update()). */
+  private walkAndAct(id: string, approach: Position) {
+    this.pendingAction = id;
+    const destination = this.navigation.safePosition(approach);
+    const route = this.navigation.findPath(this.explorer.position, destination);
+    if (route) this.beginRoute(route, destination);
+    else { this.pendingAction = null; gameBridge.notify('Ainda não há passagem até ali.'); }
   }
   private resizeScene() {
     if(!this.worldCamera) return;
