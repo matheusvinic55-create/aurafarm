@@ -17,7 +17,34 @@ const objects:SceneryObject[]=[
 for(let i=0;i<110;i++){const a=i*2.399963,r=920+(i%4)*85;objects.push({id:`forest-${i}`,kind:i%4===0?'pine':i%9===0?'goldTree':'tree',x:1200+Math.cos(a)*r,y:1210+Math.sin(a)*r*.98,scale:1.1+(i%5)*.12});}
 [[680,990],[770,1840],[1350,730],[1750,1470],[1530,1890],[970,1430],[1290,1340],[650,1540]].forEach(([x,y],i)=>objects.push({id:`flowers-${i}`,kind:'flowers',x,y,scale:.7+(i%3)*.15}));
 [[680,1200],[1540,770],[830,1870],[1770,1520],[880,650],[1280,610],[1040,600]].forEach(([x,y],i)=>objects.push({id:`shrub-${i}`,kind:'bush',x,y,scale:1,solid:{type:'ellipse',x,y,radiusX:35,radiusY:24}}));
-export const MEADOW:WorldDefinition={id:'first-meadow',revision:2,name:'Clareira do Amanhecer',width:2400,height:2400,spawn:point(1128,1368),boundary:[[520,960],[680,710],[970,480],[1370,490],[1670,720],[1760,1060],[1960,1170],[1930,1450],[1800,1650],[1710,1930],[1370,2090],[930,2000],[630,1770],[510,1390]].map(([x,y])=>point(x,y)),blockedAreas:[{type:'ellipse',x:1595,y:1635,radiusX:143,radiusY:206},{type:'rect',x:970,y:460,width:420,height:175},{type:'rect',x:1840,y:1130,width:400,height:240},{type:'rect',x:687,y:1274,width:110,height:14},{type:'rect',x:1070,y:1274,width:170,height:14}],objects,paths:[[[1190,2030],[1190,1830],[1170,1620],[1120,1450],[1050,1320],[930,1230]],[[1120,1450],[1180,1240],[1180,970],[1150,790],[1170,590]],[[1180,1240],[1430,1330],[1640,1320],[1910,1270]],[[1170,1620],[1310,1740],[1430,1810],[1540,1890]],[[1050,1320],[850,1400],[800,1580],[950,1780],[1190,1830]]].map(path=>path.map(([x,y])=>point(x,y))),zones:[{name:'Trilha das Samambaias',bounds:{type:'rect',x:600,y:350,width:1200,height:570}},{name:'Margem do Riacho',bounds:{type:'rect',x:1550,y:900,width:600,height:540}},{name:'Lago das Libélulas',bounds:{type:'rect',x:1300,y:1450,width:600,height:620}},{name:'Jardim da Casa',bounds:{type:'rect',x:540,y:930,width:510,height:550}}]};
+// Stable instance IDs survive map edits and save migrations.
+const removables:Record<string,SceneryObject['obstacleType']>={
+ 'meadow-branches':'branches','river-stone':'boulder',
+ 'stone-0':'pebble','stone-1':'pebble','stone-2':'boulder','stone-3':'boulder','stone-4':'pebble','stone-5':'pebble',
+ 'shrub-0':'shrub','shrub-1':'shrub','shrub-2':'shrub','shrub-3':'shrub'
+};
+for(const object of objects){
+ const type=removables[object.id];if(!type)continue;object.obstacleType=type;
+ object.interaction??={name:'Arbusto fechado',description:'Folhas e pequenos recursos pelo caminho.',approach:point(object.x+65,object.y+70)};
+}
+objects.push(
+ {id:'trail-branches',kind:'wood',x:1180,y:890,scale:1.2,obstacleType:'branches',solid:{type:'ellipse',x:1180,y:890,radiusX:65,radiusY:25},interaction:{name:'Galhos da trilha',description:'O primeiro passo para reencontrar a trilha.',approach:point(1200,970)}},
+ {id:'trail-log',kind:'wood',x:1190,y:770,scale:1.8,obstacleType:'log',solid:{type:'ellipse',x:1190,y:770,radiusX:85,radiusY:34},interaction:{name:'Tronco da trilha',description:'Duas ações leves para desimpedir este trecho.',approach:point(1200,845)}},
+ {id:'trail-thicket',kind:'bush',x:1170,y:670,scale:1.6,obstacleType:'thicket',solid:{type:'ellipse',x:1170,y:670,radiusX:80,radiusY:34},interaction:{name:'Samambaias do portão',description:'A última vegetação que segura o velho portão.',approach:point(1176,738)}},
+ {id:'fern-bench',kind:'bench',x:1250,y:340,scale:1,areaId:'fern-grove',solid:{type:'rect',x:1194,y:305,width:112,height:43},interaction:{name:'Recanto das Samambaias',description:'Um banco ao sol e um novo horizonte. Este lugar agora também é seu.',approach:point(1260,420)}},
+ {id:'fern-log',kind:'wood',x:1060,y:410,scale:1.3,areaId:'fern-grove',obstacleType:'log',solid:{type:'ellipse',x:1060,y:410,radiusX:58,radiusY:25},interaction:{name:'Tronco do recanto',description:'Madeira que o vento deixou entre as flores.',approach:point(1120,475)}},
+ {id:'fern-stone',kind:'rock',x:1330,y:480,scale:.7,areaId:'fern-grove',obstacleType:'pebble',solid:{type:'ellipse',x:1330,y:480,radiusX:26,radiusY:19},interaction:{name:'Pedra coberta de musgo',description:'Mais um pequeno espaço para abrir.',approach:point(1272,540)}},
+ {id:'fern-flowers',kind:'flowers',x:1130,y:315,scale:1.2,areaId:'fern-grove',interaction:{name:'Flores do recanto',description:'O perfume de um lugar que estava esperando por você.',approach:point(1128,384)}},
+ {id:'fern-future',kind:'sign',x:1160,y:220,scale:.8,areaId:'fern-grove',interaction:{name:'Além da colina',description:'A trilha continua entre as copas. Outra descoberta para o futuro.',approach:point(1160,290),future:true}},
+ {id:'fern-gold-tree',kind:'goldTree',x:1380,y:300,scale:1.05,areaId:'fern-grove',solid:{type:'ellipse',x:1380,y:300,radiusX:29,radiusY:23}},
+ {id:'fern-pine',kind:'pine',x:955,y:330,scale:.9,areaId:'fern-grove',solid:{type:'ellipse',x:955,y:330,radiusX:24,radiusY:20}}
+);
+// Keep the entrance legible instead of covering the new clearing with decorative forest.
+for(let i=objects.length-1;i>=0;i--)if(objects[i].id.startsWith('forest-')&&objects[i].x>920&&objects[i].x<1450&&objects[i].y<670)objects.splice(i,1);
+const gate=objects.find(o=>o.id==='old-gate')!;
+gate.interaction!.description='Limpe os galhos, o tronco e as samambaias da trilha para abrir este caminho.';
+export const TRAIL_BLOCKERS=['trail-branches','trail-log','trail-thicket'];
+export const MEADOW:WorldDefinition={id:'first-meadow',revision:3,name:'Clareira do Amanhecer',width:2400,height:2400,spawn:point(1128,1368),boundary:[[520,960],[680,710],[970,480],[940,200],[1390,200],[1420,510],[1670,720],[1760,1060],[1960,1170],[1930,1450],[1800,1650],[1710,1930],[1370,2090],[930,2000],[630,1770],[510,1390]].map(([x,y])=>point(x,y)),blockedAreas:[{type:'ellipse',x:1595,y:1635,radiusX:143,radiusY:206},{id:'fern-entrance',type:'rect',x:970,y:460,width:420,height:175},{type:'rect',x:1840,y:1130,width:400,height:240},{type:'rect',x:687,y:1274,width:110,height:14},{type:'rect',x:1070,y:1274,width:170,height:14}],objects,paths:[[[1170,590],[1140,500],[1170,400],[1160,270]],[[1190,2030],[1190,1830],[1170,1620],[1120,1450],[1050,1320],[930,1230]],[[1120,1450],[1180,1240],[1180,970],[1150,790],[1170,590]],[[1180,1240],[1430,1330],[1640,1320],[1910,1270]],[[1170,1620],[1310,1740],[1430,1810],[1540,1890]],[[1050,1320],[850,1400],[800,1580],[950,1780],[1190,1830]]].map(path=>path.map(([x,y])=>point(x,y))),zones:[{name:'Recanto das Samambaias',bounds:{type:'rect',x:900,y:150,width:550,height:490}},{name:'Trilha das Samambaias',bounds:{type:'rect',x:600,y:350,width:1200,height:570}},{name:'Margem do Riacho',bounds:{type:'rect',x:1550,y:900,width:600,height:540}},{name:'Lago das Libélulas',bounds:{type:'rect',x:1300,y:1450,width:600,height:620}},{name:'Jardim da Casa',bounds:{type:'rect',x:540,y:930,width:510,height:550}}]};
 export const WORLD_OBJECTS=objects.filter(object=>object.interaction);
 export const findWorldObject=(id:string)=>objects.find(object=>object.id===id);
 export interface MapProgress{unlockedAreas:string[];visitedPlaces:string[]}

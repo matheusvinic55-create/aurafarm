@@ -2,8 +2,9 @@ import { createStore } from 'zustand/vanilla';
 import { LocalStorageAdapter, SAVE_KEY } from '../persistence/localStorageAdapter';
 import { decodeSave, newSave, type SaveData } from '../persistence/schema';
 import { ENERGY, regenerate, recoverEnergy } from '../domain/energy/energy';
-import { findObject } from '../domain/objects/catalog';
-import { gainXp } from '../domain/progression/progression';
+import { interact } from '../domain/exploration/interact';
+import type { InteractionFeedback } from '../domain/exploration/types';
+import { objectPresent } from '../domain/exploration/worldState';
 import type { Position } from '../domain/player/types';
 import type { GameSettings } from '../settings/types';
 import { normalizeWorld } from '../persistence/normalizeWorld';
@@ -13,11 +14,14 @@ import { audioService } from '../audio/audioService';
 
 interface GameState {
   data: SaveData; ready: boolean; fatal: string | null; selectedId: string | null;
+  actionRequest: { id: string; serial: number } | null; feedback: InteractionFeedback | null;
+  anchor: { x: number; y: number } | null;
   zoneName: string; saveStatus: 'saved' | 'error'; notice: string; noticeId: number;
 }
 const adapter = new LocalStorageAdapter();
 export const gameStore = createStore<GameState>(() => ({
   data: newSave(), ready: false, fatal: null, selectedId: null,
+  actionRequest: null, feedback: null, anchor: null,
   zoneName: MEADOW.name, saveStatus: 'saved', notice: '', noticeId: 0
 }));
 
@@ -46,46 +50,67 @@ export const actions = {
       gameStore.setState({ fatal: 'Não foi possível abrir seu progresso com segurança. Seus dados foram preservados. Reabra o jogo para tentar novamente.' });
     }
   },
-  selectObject(id: string | null) { gameStore.setState({ selectedId: id }); },
-  move(position: Position) { if (!meadowNavigation().isWalkable(position)) return; commit(data => { data.player.position = { ...position }; }); },
+  selectObject(id: string | null) { gameStore.setState({ selectedId: id, anchor: null }); },
+  move(position: Position) { if (!meadowNavigation(gameStore.getState().data).isWalkable(position)) return; commit(data => { data.player.position = { ...position }; }); },
   notify,
   setZone(zoneName: string) { if (gameStore.getState().zoneName !== zoneName) gameStore.setState({ zoneName }); },
   visitPlace(id: string) {
     if (!findWorldObject(id)?.interaction || gameStore.getState().data.maps[MEADOW.id].visitedPlaces.includes(id)) return;
     commit(data => { data.maps[MEADOW.id].visitedPlaces.push(id); });
   },
-  collect(id: string) {
-    const object = findObject(id);
-    if (!object) return;
-    const { data, ready } = gameStore.getState();
-    if (!ready) return;
-    const now = Date.now();
-    if ((data.objects[id]?.availableAt ?? 0) > now) { notify('A natureza está se renovando. Volte em instantes.'); return; }
-    const energy = regenerate(data.energy, now);
-    if (energy.current < object.energyCost) { notify('Enquanto a energia volta, colha flores e amoras sem gastar nada.'); return; }
-    commit(draft => {
-      draft.energy = { ...energy, current: energy.current - object.energyCost };
-      draft.inventory[object.resource] += object.amount;
-      draft.objects[id] = { availableAt: now + object.respawnMs, collections: (draft.objects[id]?.collections ?? 0) + 1 };
-      draft.progression = gainXp(draft.progression, 2);
-    });
-    notify(object.kind === 'wood' ? '+3 madeiras · +2 experiência' : object.kind === 'flowers' ? '+2 fibras · sem gastar energia' : '+2 amoras · um lanche para depois');
+  setAnchor(anchor: { x: number; y: number } | null) {
+    const previous = gameStore.getState().anchor;
+    if (previous && anchor && Math.abs(previous.x-anchor.x)<2 && Math.abs(previous.y-anchor.y)<2) return;
+    if (previous === anchor) return;
+    gameStore.setState({ anchor });
+  },
+  requestInteraction(id: string) {
+    const state = gameStore.getState();
+    if (!state.ready || state.fatal) return;
+    const object = findWorldObject(id);
+    if (!object || !objectPresent(object, state.data)) return;
+    gameStore.setState({ actionRequest: { id, serial: (state.actionRequest?.serial ?? 0) + 1 } });
+  },
+  performInteraction(id: string) {
+    const state = gameStore.getState();
+    if (!state.ready || state.fatal) return;
+    const data = structuredClone(state.data);
+    const result = interact(data, id, Date.now());
+    if ('error' in result) { notify(result.error); return; }
+    commit(draft => Object.assign(draft, data));
+    gameStore.setState({ feedback: { ...result.feedback, serial: (state.feedback?.serial ?? 0) + 1 } });
+    notify(result.message);
     audioService.collect(data.settings.sound);
     if (data.settings.haptics) navigator.vibrate?.(15);
+    if (result.feedback.removed) actions.selectObject(null);
+  },
+  resetDevelopment() {
+    const current = gameStore.getState();
+    if (!current.ready || current.fatal) return;
+    try {
+      localStorage.setItem('aurafarm:dev-archive:v1', JSON.stringify(current.data));
+      const data = newSave(); data.revision = current.data.revision + 1;
+      adapter.save(data);
+      gameStore.setState({ data, selectedId: null, actionRequest: null, feedback: null, anchor: null, saveStatus: 'saved' });
+      notify('Novo começo criado. O save anterior foi arquivado neste aparelho.');
+    } catch { notify('Não foi possível arquivar seu progresso. O reset foi cancelado.'); }
   },
   eatBerry() {
     const { data } = gameStore.getState();
     if (!data.inventory.berry) { notify('As próximas aventuras trarão novos lanches.'); return; }
     if (regenerate(data.energy, Date.now()).current >= data.energy.max) { notify('Sua energia está cheia. Guarde o lanche para depois.'); return; }
+    const before = regenerate(data.energy, Date.now()).current;
     commit(draft => { draft.inventory.berry -= 1; draft.energy = recoverEnergy(draft.energy, ENERGY.berryRecovery, Date.now()); });
-    notify('Uma pausa gostosa. +10 de energia.');
+    const recovered = gameStore.getState().data.energy.current - before;
+    gameStore.setState(state => ({ feedback: { serial: (state.feedback?.serial ?? 0) + 1, objectId: 'player', removed: false, rewards: {}, unlocked: false, energy: recovered } }));
+    notify(`Uma pausa gostosa. +${recovered} de energia.`);
   },
   settings(settings: Partial<GameSettings>) { commit(data => { Object.assign(data.settings, settings); }); },
   reconcile() {
     const state = gameStore.getState();
     if (!state.ready) return;
     const energy = regenerate(state.data.energy, Date.now());
-    if (energy.current !== state.data.energy.current || state.saveStatus === 'error') commit(data => { data.energy = energy; });
+    if (energy.current !== state.data.energy.current || energy.regeneratedAt < state.data.energy.regeneratedAt || state.saveStatus === 'error') commit(data => { data.energy = energy; });
   },
   flush() {
     const state = gameStore.getState();

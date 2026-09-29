@@ -1,4 +1,4 @@
-# AuraFarm — Etapa 02
+# AuraFarm — Etapa 03
 
 Jogo cozy independente para iPhone/PWA. Este repositório nasce do zero e não compartilha código, dados, credenciais ou infraestrutura com outros aplicativos.
 
@@ -20,10 +20,13 @@ Stack: React + TypeScript + Vite, Phaser 3.90, Zustand e Zod. O Phaser é carreg
 - Propriedade explorável com caminhos, floresta, lago, casa, flores, cercas e duas passagens futuras: portão e ponte interrompida.
 - Personagem original com quatro orientações, animações de caminhada e repouso, movimento por toque e navegação A* com desvio de obstáculos.
 - Câmera suave, limitada ao mundo; profundidade por posição, transparência das copas e descarte visual fora do enquadramento.
-- Identificação e aproximação de árvores, pedras, arbustos e pontos de interesse, sem coleta completa nesta etapa.
+- Obstáculos persistentes em seis categorias, com custo por ação, resistência, recompensas e bônus controlado de amora. Partículas discretas, impacto, remoção animada e contadores integrados.
+- Galhos, tronco e vegetação liberam organicamente o Recanto das Samambaias. Névoa leve oculta o recanto; a ponte leste e a trilha além da colina permanecem futuras.
+- Controles pequenos acompanham o objeto selecionado. A ação só ocorre após a aproximação e é validada novamente no estado.
 - HUD React compacto. Experiência prioritariamente **horizontal**, `100dvh`, safe areas e aviso para girar o iPhone; sem scroll da página.
 - Salvamento automático da posição realmente percorrida e dos lugares visitados. Saves da etapa 01 preservam progresso e recursos, reposicionando o personagem no novo mapa.
-- Energia, mochila, configurações e persistência da fundação preservadas. Caminhar e observar não gastam energia.
+- Energia generosa: 240 máximos, +2/20 s inclusive offline, custos de 2 a 5 por ação e amora +30. Caminhar, observar e colher amoras são gratuitos. Todos os valores ficam em `src/config/balance.ts`.
+- Madeira, pedra, fibra e amoras persistem. Coleta de amoras gratuita renova a cada 2 minutos; obstáculos removidos nunca renascem.
 - PWA offline após a primeira abertura, atualização mediante comando e recuperação ao retornar ao aplicativo.
 
 ## Arquitetura
@@ -43,6 +46,16 @@ Stack: React + TypeScript + Vite, Phaser 3.90, Zustand e Zod. O Phaser é carreg
 | `src/audio`, `settings` | Serviço de áudio desbloqueado por gesto e preferências |
 
 O React não renderiza o mundo. O Phaser não acessa armazenamento nem componentes React: usa `engine/bridge.ts`. Comandos validam ações e alteram os dados; a cena observa o estado. Coordenadas de mundo são separadas da viewport e o depth sorting já usa Y. O mundo usa perspectiva elevada com volumes e sobreposição. Arte procedural está isolada em `engine/rendering/worldArt.ts`; personagem em `engine/characters/Explorer.ts`; enquadramento em `engine/camera/WorldCamera.ts`. Texturas definitivas e novas animações podem substituir essas implementações sem alterar os dados do jogador.
+
+## Exploração, balanceamento e transações
+
+`config/balance.ts` centraliza custos, resistência, recompensas, bônus, energia e alimentos. `domain/maps/meadow.ts` declara instâncias com IDs estáveis e tipos de obstáculo. `domain/exploration/interact.ts` aplica uma transação serializável: valida proximidade e energia, aplica dano, concede recompensas uma única vez e desbloqueia o recanto. Nenhuma recompensa depende da conclusão de uma animação. `engine/effects/ExplorationEffects.ts` cuida apenas do feedback visual.
+
+`exploration.obstacles[id]` guarda ações executadas e remoção. `worldState.ts` reconstrói sólidos e acesso às áreas; a malha de navegação só é refeita quando obstáculos removidos ou áreas abertas mudam. O schema v1 recebe campos aditivos com defaults (pedra e exploração); o mundo passa à revisão 3 preservando as posições válidas da revisão 2. A migração aumenta a capacidade de energia e mantém o déficit existente, sem resetar recursos ou nível.
+
+Regeneração usa o timestamp local salvo, respeita o máximo, guarda a fração do intervalo e reancora datas futuras em caso de relógio ajustado para trás. Não depende de execução em segundo plano. Sem servidor, o relógio do dispositivo não é uma fonte antifraude; autenticação e sincronização continuam futuras.
+
+Reset interno: em Ajustes, toque sete vezes em “AuraFarm · versão 0.3”, digite `RECOMEÇAR` e confirme. O save anterior é arquivado em `aurafarm:dev-archive:v1` antes do reset. Não existe botão de reset no HUD normal.
 
 ## Navegação e expansão do mundo
 
@@ -77,7 +90,6 @@ Repositório existente: `matheusvinic55-create/aurafarm`, branch `main`. Projeto
 
 ## Próximas etapas (não implementadas)
 
-3. Obstáculos, regras completas de coleta e desbloqueio de áreas.
 4. Fazenda, plantações, receitas, produção e inventário completo.
 5. Missões, progressão completa, personagens e narrativa.
 6. Animações, áudio, efeitos, eventos, equilíbrio e polimento.

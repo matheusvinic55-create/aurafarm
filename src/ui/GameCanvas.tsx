@@ -34,7 +34,7 @@ export function GameCanvas() {
     };
   }, []);
   return <>
-    <div ref={host} className="game-canvas" role="application" aria-label="Clareira: toque no chão para caminhar. Toque em árvores, pedras, placas e construções para observar. Jogue com o aparelho na horizontal." />
+    <div ref={host} className="game-canvas" role="application" aria-label="Clareira: toque no chão para caminhar. Toque nos obstáculos para ver o custo e limpar. Colha amoras sem gastar energia. Jogue com o aparelho na horizontal." />
     {!loaded && <div className="loading-scene"><span className="loading-leaf">✦</span><p>{error ? 'Não foi possível abrir a clareira.' : 'Preparando seu cantinho…'}</p>{error && <button onClick={() => location.reload()}>Tentar novamente</button>}</div>}
   </>;
 }

@@ -7,5 +7,7 @@ export const gameBridge = {
   move: actions.move,
   notify: actions.notify,
   zone: actions.setZone,
-  visit: actions.visitPlace
+  visit: actions.visitPlace,
+  anchor: actions.setAnchor,
+  interact: actions.performInteraction
 };
