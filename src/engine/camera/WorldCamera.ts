@@ -3,7 +3,7 @@ import type { WorldDefinition } from '../../domain/maps/types';
 
 /** The camera belongs to the player's gestures, never to character movement. */
 export class WorldCamera {
-  private userZoom = .8;
+  private userZoom = .55;
   private initialized = false;
 
   constructor(
@@ -17,7 +17,7 @@ export class WorldCamera {
 
   resize(width: number, height: number) {
     const fit = Math.max(width / this.world.width, height / this.world.height);
-    this.userZoom = Math.max(fit, Math.min(this.userZoom, 1.08));
+    this.userZoom = Math.max(fit, Math.min(this.userZoom, 1.02));
     this.camera.setZoom(this.userZoom);
     // Frame the saved character once when opening the world. Walking never recenters it.
     if (!this.initialized) {
@@ -31,10 +31,10 @@ export class WorldCamera {
     this.camera.scrollY = this.camera.clampY(this.camera.scrollY - dy / this.camera.zoom);
   }
 
-  /** Pinch keeps the existing zoom range. Phaser clamps the viewport to world bounds. */
+  /** Panoramic farm framing by default; pinch can still move from overview to close inspection. Phaser clamps the viewport to world bounds. */
   zoomBy(factor: number) {
     const fit = Math.max(this.camera.width / this.world.width, this.camera.height / this.world.height);
-    const next = Phaser.Math.Clamp(this.userZoom * factor, Math.max(.58, fit), 1.08);
+    const next = Phaser.Math.Clamp(this.userZoom * factor, Math.max(.46, fit), 1.02);
     if (Math.abs(next - this.userZoom) < .001) return;
     this.userZoom = next;
     this.camera.setZoom(next);
