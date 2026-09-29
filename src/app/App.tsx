@@ -14,8 +14,10 @@ import { WORLD_OBJECTS } from '../domain/maps/meadow';
 import { ENERGY } from '../domain/energy/energy';
 import { requiredXp } from '../domain/progression/progression';
 import { audioService } from '../audio/audioService';
+import { QuestJournal, CharacterDialogue } from '../ui/QuestJournal';
+import { characterById } from '../domain/characters/catalog';
 
-type Panel = 'inventory' | 'settings' | 'help' | 'energy' | null;
+type Panel = 'inventory' | 'settings' | 'help' | 'energy' | 'quests' | null;
 
 export function App() {
   const state = useStore(gameStore, useShallow(({data,ready,fatal,selectedId,saveStatus,notice,noticeId,zoneName,feedback})=>({data,ready,fatal,selectedId,saveStatus,notice,noticeId,zoneName,feedback})));
@@ -94,15 +96,18 @@ export function App() {
       {saveStatus === 'error' && <div className="save-warning" role="alert">O salvamento está indisponível. Mantenha o jogo aberto até aparecer “Progresso salvo”.</div>}
       <nav className="toolbar" aria-label="Menu do jogo">
         <button className="tool" onClick={() => open('inventory')}><span className="tool-icon"><Icon name="backpack" size={23} /></span><span>Mochila</span></button>
+        <button className="tool" onClick={() => open('quests')}><span className="tool-icon"><Icon name="sparkles" size={22}/></span><span>Jornada</span></button>
         <button className="tool farm-shortcut" onClick={() => focusResource(PLOTS[0].id)}><span className="tool-icon"><Icon name="sprout" size={22}/></span><span>Horta</span></button>
         <button className="tool" onClick={() => open('settings')}><span className="tool-icon"><Icon name="settings" size={22} /></span><span>Ajustes</span></button>
       </nav>
     </section>
 
     <FarmInteraction now={now} />
+    {state.selectedId?.startsWith('npc-') && characterById(state.selectedId.slice(4)) && <CharacterDialogue id={state.selectedId.slice(4)} close={()=>actions.selectObject(null)} />}
     <div className="rotate-device" role="status"><span className="rotate-icon"><Icon name="rotate" size={42} /></span><div className="wordmark">AuraFarm</div><h2>Um mundo para ver de lado.</h2><p>Gire seu iPhone para a horizontal<br />e entre na clareira.</p><small>Se a tela não girar, desative o bloqueio de rotação.</small></div>
-    {panel && <Sheet title={panel === 'inventory' ? 'Sua mochila' : panel === 'settings' ? 'Do seu jeito' : panel === 'energy' ? 'Energia para explorar' : 'Um novo começo'} close={() => setPanel(null)}>
+    {panel && <Sheet title={panel === 'inventory' ? 'Sua mochila' : panel === 'settings' ? 'Do seu jeito' : panel === 'energy' ? 'Energia para explorar' : panel === 'quests' ? 'Sua jornada' : 'Um novo começo'} close={() => setPanel(null)}>
       {panel === 'inventory' && <Inventory />}
+      {panel === 'quests' && <QuestJournal />}
       {panel === 'energy' && <>
         <div className="energy-summary"><Icon name="energy" size={28} /><strong>{data.energy.current}<small> / {data.energy.max}</small></strong></div>
         <p className="sheet-intro">A energia cuida do ritmo da exploração. A clareira continua sendo sua, mesmo quando ela acaba.</p>
@@ -119,7 +124,7 @@ export function App() {
         ] as const).map(([key, label, detail]) => <label className="setting-row" key={key}><span><strong>{label}</strong><small>{detail}</small></span><input type="checkbox" checked={data.settings[key]} onChange={event => { if (key === 'sound' && event.target.checked) void audioService.unlock(); actions.settings({ [key]: event.target.checked }); }} /><span className="switch" aria-hidden="true" /></label>)}
         <button className="text-link" onClick={() => setPanel('help')}><Icon name="help" size={18} />Como aproveitar a clareira<Icon name="chevron" size={17} /></button>
         {needRefresh && <button className="primary-button full" onClick={() => { actions.flush(); if (gameStore.getState().saveStatus === 'saved') void updateServiceWorker(true); }}>Salvar e atualizar o jogo</button>}
-        <button className="version-tap" onClick={()=>setDevTaps(value=>value+1)}>AuraFarm · versão 0.4</button>
+        <button className="version-tap" onClick={()=>setDevTaps(value=>value+1)}>AuraFarm · versão 0.5</button>
         {devTaps>=7 && <div className="dev-reset"><strong>Desenvolvimento · novo começo</strong><p>Arquiva o save atual neste aparelho e reinicia apenas o AuraFarm. Digite RECOMEÇAR para confirmar.</p><input aria-label="Confirmação do reset de desenvolvimento" value={resetText} onChange={event=>setResetText(event.target.value)} placeholder="RECOMEÇAR"/><button className="text-link" disabled={resetText!=='RECOMEÇAR'} onClick={()=>{actions.resetDevelopment();setResetText('');setDevTaps(0);setPanel(null);}}>Arquivar e recomeçar</button></div>}
         <p className="footnote">Cada pequeno caminho aberto guarda uma descoberta.</p>
       </>}
