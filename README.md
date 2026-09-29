@@ -1,4 +1,4 @@
-# AuraFarm — Etapa 03
+# AuraFarm — Etapa 04
 
 Jogo cozy independente para iPhone/PWA. Este repositório nasce do zero e não compartilha código, dados, credenciais ou infraestrutura com outros aplicativos.
 
@@ -22,7 +22,7 @@ Stack: React + TypeScript + Vite, Phaser 3.90, Zustand e Zod. O Phaser é carreg
 - Câmera suave, limitada ao mundo; profundidade por posição, transparência das copas e descarte visual fora do enquadramento.
 - Obstáculos persistentes em seis categorias, com custo por ação, resistência, recompensas e bônus controlado de amora. Partículas discretas, impacto, remoção animada e contadores integrados.
 - Galhos, tronco e vegetação liberam organicamente o Recanto das Samambaias. Névoa leve oculta o recanto; a ponte leste e a trilha além da colina permanecem futuras.
-- Controles pequenos acompanham o objeto selecionado. A ação só ocorre após a aproximação e é validada novamente no estado.
+- Arraste com um dedo para mover a câmera e use pinça para zoom. Dois toques executam a exploração sem cards. Ações de fazenda usam seletores pequenos, aproximação do personagem e validação no estado.
 - HUD React compacto. Experiência prioritariamente **horizontal**, `100dvh`, safe areas e aviso para girar o iPhone; sem scroll da página.
 - Salvamento automático da posição realmente percorrida e dos lugares visitados. Saves da etapa 01 preservam progresso e recursos, reposicionando o personagem no novo mapa.
 - Energia generosa: 240 máximos, +2/20 s inclusive offline, custos de 2 a 5 por ação e amora +30. Caminhar, observar e colher amoras são gratuitos. Todos os valores ficam em `src/config/balance.ts`.
@@ -41,8 +41,8 @@ Stack: React + TypeScript + Vite, Phaser 3.90, Zustand e Zod. O Phaser é carreg
 | `src/domain/energy`, `progression` | Regras puras de energia e experiência |
 | `src/domain/maps`, `objects` | Definição do mundo, terreno navegável, sólidos, áreas bloqueadas e interações |
 | `src/domain/quests`, `characters` | Contratos iniciais para missões, NPCs e narrativa |
-| `src/domain/economy`, `farming` | Contratos para moedas, construções e cultivos; sem sistemas complexos nesta etapa |
-| `src/persistence` | Schema v1, migrações futuras, adaptador local e porta de sincronização remota |
+| `src/domain/economy`, `farming` | Cultivo e produção por timestamps, receitas e contratos de expansão |
+| `src/persistence` | Schema v2, migração segura de v1, adaptador local e porta de sincronização remota |
 | `src/audio`, `settings` | Serviço de áudio desbloqueado por gesto e preferências |
 
 O React não renderiza o mundo. O Phaser não acessa armazenamento nem componentes React: usa `engine/bridge.ts`. Comandos validam ações e alteram os dados; a cena observa o estado. Coordenadas de mundo são separadas da viewport e o depth sorting já usa Y. O mundo usa perspectiva elevada com volumes e sobreposição. Arte procedural está isolada em `engine/rendering/worldArt.ts`; personagem em `engine/characters/Explorer.ts`; enquadramento em `engine/camera/WorldCamera.ts`. Texturas definitivas e novas animações podem substituir essas implementações sem alterar os dados do jogador.
@@ -55,7 +55,7 @@ O React não renderiza o mundo. O Phaser não acessa armazenamento nem component
 
 Regeneração usa o timestamp local salvo, respeita o máximo, guarda a fração do intervalo e reancora datas futuras em caso de relógio ajustado para trás. Não depende de execução em segundo plano. Sem servidor, o relógio do dispositivo não é uma fonte antifraude; autenticação e sincronização continuam futuras.
 
-Reset interno: em Ajustes, toque sete vezes em “AuraFarm · versão 0.3”, digite `RECOMEÇAR` e confirme. O save anterior é arquivado em `aurafarm:dev-archive:v1` antes do reset. Não existe botão de reset no HUD normal.
+Reset interno: em Ajustes, toque sete vezes em “AuraFarm · versão 0.4”, digite `RECOMEÇAR` e confirme. O save anterior é arquivado em `aurafarm:dev-archive:v1` antes do reset. Não existe botão de reset no HUD normal.
 
 ## Navegação e expansão do mundo
 
@@ -90,8 +90,21 @@ Repositório existente: `matheusvinic55-create/aurafarm`, branch `main`. Projeto
 
 ## Próximas etapas (não implementadas)
 
-4. Fazenda, plantações, receitas, produção e inventário completo.
 5. Missões, progressão completa, personagens e narrativa.
 6. Animações, áudio, efeitos, eventos, equilíbrio e polimento.
 
 Regra permanente: **“Energia controla o ritmo da exploração; não controla o direito de jogar.”** Cuidar da fazenda, produzir, decorar e conversar devem continuar disponíveis sem energia. Não há monetização nem mecanismos de escassez artificial.
+
+## Fazenda, cozinha e inventário (Etapa 04)
+
+Seis canteiros ao sul da casa, com trigo (45 s), milho (60 s) e cenoura (90 s). Toque no canteiro vazio para escolher uma semente; brotos e plantas maduras têm texturas distintas. Regar uma vez é opcional e reduz 20% do tempo original; nenhuma planta morre. Colher é um toque, com aproximação do personagem e fila curta de ações para colher vários canteiros. Cada colheita concede o cultivo e duas sementes. Nenhuma dessas ações gasta energia.
+
+A cozinha física ao lado da horta mói farinha (20 s), assa pão com farinha e milho (30 s) e prepara sopa de cenoura e milho com madeira (40 s). Uma produção por vez, ingredientes descontados atomicamente no início e produto concedido apenas ao coletar. O resultado e a duração são fotografados no job; alterar receitas futuras não muda trabalhos existentes. A indicação de conclusão é derivada de `readyAt` ao reabrir, sem timers de background.
+
+A mochila possui cinco categorias, quantidades e uso de alimentos. Energia reúne os itens com recuperação, mesmo que também pertençam a Cultivos ou Produção. Cenoura recupera até 12, pão 55 e sopa 75; sempre respeitam o máximo. Capacidade ilimitada nesta etapa.
+
+`config/farming.ts` centraliza sementes, tempos, rendimentos, receitas, recuperação, capacidade futura e expansão. `domain/farming/catalog.ts` define culturas e canteiros estáveis; `domain/production/catalog.ts` reúne receitas. A engine atualiza os estágios por uma única verificação temporal e só troca texturas alteradas. Não há um timer por cultura nem salvamento por estágio visual.
+
+Schema v2 mantém a chave histórica `aurafarm:save:v1` para encontrar o progresso existente. A migração v1 → v2 preserva inventário anterior, energia, obstáculos, áreas e posição segura; adiciona seis sementes de cada cultura, seis canteiros e produção vazia apenas quando os campos não existem. Saves já migrados não ganham sementes novamente. Revisão do mundo 4 acrescenta somente o volume da cozinha, mantendo o mapa e a câmera. IDs e campos de área permitem expansão futura.
+
+Verificação essencial da etapa: build TypeScript/Vite/PWA; migração de um save v1 com progresso; acesso por navegação a todos os canteiros e à cozinha; crescimento e produção após serialização/reabertura; bloqueio de coleta duplicada; ações com energia zero; recuperação limitada ao máximo. A conferência visual e funcional no iPhone fica com o usuário.

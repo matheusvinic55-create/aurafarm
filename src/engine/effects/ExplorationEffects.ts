@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { Position } from '../../domain/player/types';
 import type { InteractionFeedback } from '../../domain/exploration/types';
-import { RESOURCES, type ResourceId } from '../../domain/resources/catalog';
+import { ITEMS, type ItemId } from '../../domain/inventory/catalog';
 /** Bounded, short-lived effects. Rewards are already committed before these run. */
 export class ExplorationEffects {
   constructor(private scene: Phaser.Scene) {}
@@ -17,7 +17,7 @@ export class ExplorationEffects {
       const dot = this.scene.add.circle(position.x, position.y-20, 3+i%2, i%2 ? 0xe9dba4 : 0xa3be72).setDepth(4000);
       this.scene.tweens.add({ targets: dot, x: position.x+Math.cos(i*2.4)*50, y: position.y-40-Math.sin(i*2.4)*30, alpha: 0, duration: 500, onComplete: () => dot.destroy() });
     }
-    const text = Object.entries(event.rewards).map(([id, count]) => `+${count} ${RESOURCES[id as ResourceId].plural}`).join(' · ');
+    const text = Object.entries(event.rewards).map(([id, count]) => `+${count} ${ITEMS[id as ItemId].plural}`).join(' · ');
     const energy = event.energy ? `${event.energy>0?'+':''}${event.energy} energia` : '';
     const label = this.scene.add.text(position.x, position.y-95, [text, energy].filter(Boolean).join('\n'), {
       fontFamily: '-apple-system, sans-serif', fontSize: '17px', color: '#fff9dc', stroke: '#405b38', strokeThickness: 4, align: 'center'

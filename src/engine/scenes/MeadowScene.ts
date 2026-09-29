@@ -1,3 +1,6 @@
+import { FarmLayer } from '../rendering/farmArt';
+import { findFarmTarget, STATIONS } from '../../domain/farming/catalog';
+import type { FarmCommand } from '../../domain/farming/types';
 import Phaser from 'phaser';
 import { gameBridge } from '../bridge';
 import { MEADOW, findWorldObject } from '../../domain/maps/meadow';
@@ -12,6 +15,10 @@ import { WorldCamera } from '../camera/WorldCamera';
 import { ExplorationEffects } from '../effects/ExplorationEffects';
 
 export class MeadowScene extends Phaser.Scene {
+  private farmLayer!: FarmLayer;
+  private farmQueue: FarmCommand[] = [];
+  private farmActive = false;
+  private farmTick = 0;
   private explorer!: Explorer;
   private worldCamera!: WorldCamera;
   private effects!: ExplorationEffects;
@@ -65,6 +72,7 @@ export class MeadowScene extends Phaser.Scene {
       image.setVisible(objectPresent(object, gameBridge.snapshot().data));
       this.scenery.push({ data: object, image });
     }
+    this.farmLayer = new FarmLayer(this, (id, pointer) => this.tapFarm(id, pointer));
     this.fog = this.add.graphics().setDepth(2600);
     this.fog.fillStyle(0x718f68, .96).fillEllipse(1180, 190, 660, 850);
     for (let i=0; i<9; i++) this.fog.fillStyle(i%2?0x9bb183:0x829f72, .7).fillEllipse(955+i*55, 510+Math.sin(i)*24, 155, 110);
@@ -108,12 +116,12 @@ export class MeadowScene extends Phaser.Scene {
       if(!this.navigation.isWalkable(p)) { gameBridge.notify('Esse trecho ainda está fechado. Siga pela clareira ou limpe os obstáculos.'); return; }
       const route = this.navigation.findPath(this.explorer.position,p);
       if(!route) { gameBridge.notify('Ainda não há passagem até ali.'); return; }
-      gameBridge.select(null); this.pendingAction=null; this.worldCamera.resumeFollow(); this.beginRoute(route,p);
+      gameBridge.select(null); this.farmQueue=[]; this.farmActive=false; this.pendingAction=null; this.worldCamera.resumeFollow(); this.beginRoute(route,p);
     });
     this.unsubscribe = gameBridge.subscribe((next, previous) => {
       if (navigationKey(next.data)!==navigationKey(previous.data)) {
         this.navigation = meadowNavigation(next.data);
-        this.route=[]; this.pendingAction=null; this.destination.setVisible(false);
+        this.route=[]; this.pendingAction=null; this.farmQueue=[]; this.farmActive=false; this.destination.setVisible(false);
         this.explorer.setPosition(this.navigation.safePosition(this.explorer.position));
         if(groveOpen(next.data)) {
           this.tweens.add({ targets: this.fog, alpha: 0, duration: next.data.settings.reducedMotion?0:700, onComplete: () => this.fog.setVisible(false) });
@@ -123,8 +131,15 @@ export class MeadowScene extends Phaser.Scene {
       if(next.selectedId!==previous.selectedId) this.selectObject(next.selectedId);
       const a=next.data.player.position,b=previous.data.player.position;
       if(!this.saving && (a.x!==b.x || a.y!==b.y)) {
-        this.route=[]; this.pendingAction=null;
+        this.route=[]; this.pendingAction=null; this.farmQueue=[]; this.farmActive=false;
         this.explorer.setPosition(this.navigation.safePosition(a)); this.destination.setVisible(false);
+      }
+      if(next.farmRequest && next.farmRequest !== previous.farmRequest) {
+        const command = next.farmRequest.command;
+        if (!this.farmQueue.some(c => c.targetId === command.targetId && c.kind === command.kind)) {
+          this.farmQueue.push(command);
+          if (!this.farmActive) this.startFarmRoute();
+        }
       }
       if(next.actionRequest && next.actionRequest!==previous.actionRequest) {
         this.selectObject(next.actionRequest.id); this.pendingAction=next.actionRequest.id;
@@ -132,7 +147,9 @@ export class MeadowScene extends Phaser.Scene {
       if(next.feedback && next.feedback!==previous.feedback) {
         const event=next.feedback, item=this.scenery.find(item=>item.data.id===event.objectId);
         if(event.removed && item) { this.retiring.set(item.data.id,this.time.now+360); item.image.setVisible(true); }
-        this.effects.play(event, item?.data??this.explorer.position, item?.image, next.data.settings.reducedMotion);
+        this.farmLayer.refresh(next.data, Date.now());
+        this.farmLayer.feedback(event.objectId, next.data.settings.reducedMotion);
+        this.effects.play(event, findFarmTarget(event.objectId) ?? item?.data??this.explorer.position, item?.image, next.data.settings.reducedMotion);
       }
       if(next.data.settings.reducedMotion!==previous.data.settings.reducedMotion) this.worldCamera.setReducedMotion(next.data.settings.reducedMotion);
     });
@@ -143,6 +160,7 @@ export class MeadowScene extends Phaser.Scene {
       document.removeEventListener('visibilitychange',this.hide); window.removeEventListener('pagehide',this.pageHide);
       gameBridge.anchor(null); this.scenery=[]; this.motes=[]; this.retiring.clear();
     });
+    this.farmLayer.refresh(gameBridge.snapshot().data, Date.now());
     this.resizeScene(); this.checkpoint();
   }
   private resizeScene() {
@@ -154,7 +172,15 @@ export class MeadowScene extends Phaser.Scene {
     this.route=route; this.waypoint=0; this.destination.setPosition(destination.x,destination.y).setVisible(true);
   }
   private selectObject(id: string|null) {
-    this.selected=id; this.pendingAction=null;
+    this.selected=id; this.pendingAction=null; this.farmQueue=[]; this.farmActive=false;
+    const farm = id ? findFarmTarget(id) : undefined;
+    if (farm) {
+      this.ring.setPosition(farm.x, farm.y + 4).setSize(112, 48).setDepth(farm.y - .5).setVisible(true);
+      const destination = this.navigation.safePosition(farm.approach);
+      const route = this.navigation.findPath(this.explorer.position, destination);
+      if (route) this.beginRoute(route, destination);
+      return;
+    }
     const object=id?findWorldObject(id):undefined;
     if(!object?.interaction) { this.ring.setVisible(false); gameBridge.anchor(null); return; }
     this.ring.setPosition(object.x,object.y+4).setSize(Math.min(180,ART[object.kind].w*.65*object.scale),40).setDepth(object.y-.5).setVisible(true);
@@ -162,6 +188,30 @@ export class MeadowScene extends Phaser.Scene {
     const route=this.navigation.findPath(this.explorer.position,destination);
     if(route) this.beginRoute(route,destination);
     else { this.route=[]; gameBridge.notify('Limpe os obstáculos mais próximos primeiro.'); }
+  }
+  private tapFarm(id: string, pointer: Phaser.Input.Pointer) {
+    if (pointer.getDistance() > 15 || this.gesture.dragging || this.gesture.pinchDistance > 0 || document.querySelector('dialog[open]')) return;
+    const data = gameBridge.snapshot().data;
+    const crop = data.crops.find(c => c.plotId === id);
+    const job = data.production.find(j => j.stationId === id);
+    if (crop && Date.now() >= crop.readyAt) {
+      gameBridge.requestFarm({ kind: 'harvest', targetId: id });
+    } else if (job && Date.now() >= job.readyAt) {
+      gameBridge.requestFarm({ kind: 'collect', targetId: id });
+    } else if (data.farm.plots[id]?.unlocked || STATIONS.some(s => s.id === id)) {
+      gameBridge.select(id);
+    }
+  }
+  private startFarmRoute() {
+    const command = this.farmQueue[0];
+    if (!command) { this.farmActive = false; return; }
+    const target = findFarmTarget(command.targetId);
+    if (!target) { this.farmQueue.shift(); this.startFarmRoute(); return; }
+    const destination = this.navigation.safePosition(target.approach);
+    const route = this.navigation.findPath(this.explorer.position, destination);
+    if (!route) { gameBridge.notify('Ainda não há passagem até ali.'); this.farmQueue.shift(); this.startFarmRoute(); return; }
+    this.pendingAction = null; this.farmActive = true;
+    this.beginRoute(route, destination);
   }
   private checkpoint() {
     if(!this.explorer) return;
@@ -175,10 +225,17 @@ export class MeadowScene extends Phaser.Scene {
     while(this.waypoint<this.route.length && budget>0) {
       const p=this.explorer.position,target=this.route[this.waypoint],distance=Math.hypot(target.x-p.x,target.y-p.y);
       const step=Math.min(budget,distance),next=distance<.001?target:{x:p.x+(target.x-p.x)*step/distance,y:p.y+(target.y-p.y)*step/distance};
-      if(!this.navigation.segmentClear(p,next)) { this.route=[];this.pendingAction=null;this.destination.setVisible(false);this.checkpoint();break; }
+      if(!this.navigation.segmentClear(p,next)) { this.route=[];this.pendingAction=null;this.farmQueue=[];this.farmActive=false;this.destination.setVisible(false);this.checkpoint();break; }
       this.explorer.setPosition(next);budget-=step;
       if(distance<=step+.01) { this.waypoint++;if(this.waypoint===this.route.length) { this.destination.setVisible(false);this.checkpoint();if(this.selected)gameBridge.visit(this.selected); } }
     }
+    if(this.farmActive && this.waypoint >= this.route.length) {
+      const command = this.farmQueue.shift();
+      this.farmActive = false; this.checkpoint();
+      if (command) gameBridge.farm(command);
+      this.startFarmRoute();
+    }
+    if (time - this.farmTick > 1000) { this.farmLayer.refresh(gameBridge.snapshot().data, Date.now()); this.farmTick = time; }
     if(this.pendingAction && this.waypoint>=this.route.length) {
       const id=this.pendingAction; this.pendingAction=null; this.checkpoint(); gameBridge.interact(id);
     }
@@ -195,7 +252,7 @@ export class MeadowScene extends Phaser.Scene {
         if(visible&&!retiring) {const canopy=['tree','pine','goldTree'].includes(object.kind);image.setAlpha(canopy&&p.y<object.y&&p.y>object.y-210*object.scale&&Math.abs(p.x-object.x)<75*object.scale?.56:1);}
       }
       const zone=MEADOW.zones.find(zone=>contains(zone.bounds,p));gameBridge.zone(zone?.name??MEADOW.name);
-      const selected=this.selected?findWorldObject(this.selected):null;
+      const selected=this.selected?(findFarmTarget(this.selected) ?? findWorldObject(this.selected)):null;
       if(selected)gameBridge.anchor({x:(selected.x-view.x)*camera.zoom,y:(selected.y-view.y)*camera.zoom});
       this.lastCull=time;
     }

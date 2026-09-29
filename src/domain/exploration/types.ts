@@ -1,4 +1,4 @@
-import type { ResourceId } from '../resources/catalog';
+import type { ItemId } from '../inventory/catalog';
 export interface ObstacleProgress { hits: number; removed: boolean }
 export interface ExplorationProgress { obstacles: Record<string, ObstacleProgress> }
 export interface InteractionFeedback {
@@ -6,6 +6,6 @@ export interface InteractionFeedback {
   objectId: string;
   removed: boolean;
   energy: number;
-  rewards: Partial<Record<ResourceId, number>>;
+  rewards: Partial<Record<ItemId, number>>;
   unlocked: boolean;
 }

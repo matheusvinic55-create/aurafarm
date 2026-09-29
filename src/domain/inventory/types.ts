@@ -1,2 +1,2 @@
-import type { ResourceId } from '../resources/catalog';
-export type Inventory = Record<ResourceId, number>;
+import type { ItemId } from './catalog';
+export type Inventory = Record<ItemId, number>;

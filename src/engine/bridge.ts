@@ -9,5 +9,7 @@ export const gameBridge = {
   zone: actions.setZone,
   visit: actions.visitPlace,
   anchor: actions.setAnchor,
+  requestFarm: actions.requestFarm,
+  farm: actions.performFarm,
   interact: actions.performInteraction
 };

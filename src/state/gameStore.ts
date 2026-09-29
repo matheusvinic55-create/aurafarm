@@ -1,7 +1,11 @@
+import { performFarmCommand } from '../domain/farming/actions';
+import type { FarmCommand } from '../domain/farming/types';
+import { findFarmTarget } from '../domain/farming/catalog';
+import { itemDefinition, type ItemId } from '../domain/inventory/catalog';
 import { createStore } from 'zustand/vanilla';
 import { LocalStorageAdapter, SAVE_KEY } from '../persistence/localStorageAdapter';
 import { decodeSave, newSave, type SaveData } from '../persistence/schema';
-import { ENERGY, regenerate, recoverEnergy } from '../domain/energy/energy';
+import { regenerate, recoverEnergy } from '../domain/energy/energy';
 import { interact } from '../domain/exploration/interact';
 import type { InteractionFeedback } from '../domain/exploration/types';
 import { objectPresent } from '../domain/exploration/worldState';
@@ -14,6 +18,7 @@ import { audioService } from '../audio/audioService';
 
 interface GameState {
   data: SaveData; ready: boolean; fatal: string | null; selectedId: string | null;
+  farmRequest: { command: FarmCommand; serial: number } | null;
   actionRequest: { id: string; serial: number } | null; feedback: InteractionFeedback | null;
   anchor: { x: number; y: number } | null;
   zoneName: string; saveStatus: 'saved' | 'error'; notice: string; noticeId: number;
@@ -21,7 +26,7 @@ interface GameState {
 const adapter = new LocalStorageAdapter();
 export const gameStore = createStore<GameState>(() => ({
   data: newSave(), ready: false, fatal: null, selectedId: null,
-  actionRequest: null, feedback: null, anchor: null,
+  farmRequest: null, actionRequest: null, feedback: null, anchor: null,
   zoneName: MEADOW.name, saveStatus: 'saved', notice: '', noticeId: 0
 }));
 
@@ -84,6 +89,35 @@ export const actions = {
     if (data.settings.haptics) navigator.vibrate?.(15);
     if (result.feedback.removed) actions.selectObject(null);
   },
+  requestFarm(command: FarmCommand) {
+    const state = gameStore.getState();
+    if (!state.ready || state.fatal || !findFarmTarget(command.targetId)) return;
+    gameStore.setState({ farmRequest: { command, serial: (state.farmRequest?.serial ?? 0) + 1 } });
+  },
+  performFarm(command: FarmCommand) {
+    const state = gameStore.getState();
+    if (!state.ready || state.fatal) return;
+    const data = structuredClone(state.data);
+    const result = performFarmCommand(data, command, Date.now());
+    if ('error' in result) { notify(result.error); return; }
+    commit(draft => Object.assign(draft, data));
+    gameStore.setState({ feedback: { ...result.feedback, serial: (state.feedback?.serial ?? 0) + 1 } });
+    notify(result.message);
+    audioService.collect(data.settings.sound);
+    if (data.settings.haptics) navigator.vibrate?.(15);
+  },
+  eatItem(id: ItemId) {
+    const { data, ready, fatal } = gameStore.getState();
+    if (!ready || fatal) return;
+    const recovery = itemDefinition(id).recovery;
+    if (!recovery || !data.inventory[id]) return;
+    const before = regenerate(data.energy, Date.now()).current;
+    if (before >= data.energy.max) { notify('Sua energia está cheia. Guarde para depois.'); return; }
+    commit(draft => { draft.inventory[id] -= 1; draft.energy = recoverEnergy(draft.energy, recovery, Date.now()); });
+    const recovered = gameStore.getState().data.energy.current - before;
+    gameStore.setState(state => ({ feedback: { serial: (state.feedback?.serial ?? 0) + 1, objectId: 'player', removed: false, rewards: {}, unlocked: false, energy: recovered } }));
+    notify(`Uma pausa gostosa. +${recovered} de energia.`);
+  },
   resetDevelopment() {
     const current = gameStore.getState();
     if (!current.ready || current.fatal) return;
@@ -91,20 +125,11 @@ export const actions = {
       localStorage.setItem('aurafarm:dev-archive:v1', JSON.stringify(current.data));
       const data = newSave(); data.revision = current.data.revision + 1;
       adapter.save(data);
-      gameStore.setState({ data, selectedId: null, actionRequest: null, feedback: null, anchor: null, saveStatus: 'saved' });
+      gameStore.setState({ data, selectedId: null, farmRequest: null, actionRequest: null, feedback: null, anchor: null, saveStatus: 'saved' });
       notify('Novo começo criado. O save anterior foi arquivado neste aparelho.');
     } catch { notify('Não foi possível arquivar seu progresso. O reset foi cancelado.'); }
   },
-  eatBerry() {
-    const { data } = gameStore.getState();
-    if (!data.inventory.berry) { notify('As próximas aventuras trarão novos lanches.'); return; }
-    if (regenerate(data.energy, Date.now()).current >= data.energy.max) { notify('Sua energia está cheia. Guarde o lanche para depois.'); return; }
-    const before = regenerate(data.energy, Date.now()).current;
-    commit(draft => { draft.inventory.berry -= 1; draft.energy = recoverEnergy(draft.energy, ENERGY.berryRecovery, Date.now()); });
-    const recovered = gameStore.getState().data.energy.current - before;
-    gameStore.setState(state => ({ feedback: { serial: (state.feedback?.serial ?? 0) + 1, objectId: 'player', removed: false, rewards: {}, unlocked: false, energy: recovered } }));
-    notify(`Uma pausa gostosa. +${recovered} de energia.`);
-  },
+  eatBerry() { actions.eatItem('berry'); },
   settings(settings: Partial<GameSettings>) { commit(data => { Object.assign(data.settings, settings); }); },
   reconcile() {
     const state = gameStore.getState();
