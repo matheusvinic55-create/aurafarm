@@ -65,7 +65,8 @@ for (const area of MEADOW.blockedAreas) {
 }
 for (const zone of MEADOW.zones) {
   zone.bounds.x = spread(zone.bounds.x); zone.bounds.y = spread(zone.bounds.y);
-  zone.bounds.width *= WORLD_SCALE; zone.bounds.height *= WORLD_SCALE;
+  if (zone.bounds.type === 'rect') { zone.bounds.width *= WORLD_SCALE; zone.bounds.height *= WORLD_SCALE; }
+  else { zone.bounds.radiusX *= WORLD_SCALE; zone.bounds.radiusY *= WORLD_SCALE; }
 }
 export const WORLD_OBJECTS=objects.filter(object=>object.interaction);
 export const findWorldObject=(id:string)=>objects.find(object=>object.id===id);
