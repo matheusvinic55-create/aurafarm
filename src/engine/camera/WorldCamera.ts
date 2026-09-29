@@ -1,4 +1,4 @@
-import type Phaser from 'phaser';
+import Phaser from 'phaser';
 import type { WorldDefinition } from '../../domain/maps/types';
 
 /** Landscape camera with bounded follow, one-finger panning and pinch zoom. */
