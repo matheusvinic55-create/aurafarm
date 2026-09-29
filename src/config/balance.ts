@@ -2,6 +2,7 @@
 export const BALANCE = {
   energy: { max: 240, regenerationMs: 20_000, regenerationAmount: 2, berryRecovery: 30 },
   interactionRange: 105,
+  objectReach: 200,
   berries: { amount: 2, cooldownMs: 120_000, startingAmount: 3 },
   discovery: { energy: 40, berries: 2 },
   obstacles: {
