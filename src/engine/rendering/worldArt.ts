@@ -6,7 +6,7 @@ const ellipse=(c:C,x:number,y:number,rx:number,ry:number,color:string)=>{c.fillS
 const polygon=(c:C,p:number[][],color:string)=>{c.fillStyle=color;c.beginPath();p.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.closePath();c.fill();};
 const line=(c:C,p:number[][],color:string,width:number)=>{c.strokeStyle=color;c.lineWidth=width;c.lineCap='round';c.beginPath();p.forEach(([x,y],i)=>i?c.lineTo(x,y):c.moveTo(x,y));c.stroke();};
 const random=(seed:number)=>()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
-export const ART:Record<SceneryKind,{w:number;h:number;foot:number}>={tree:{w:250,h:300,foot:270},goldTree:{w:250,h:300,foot:270},pine:{w:230,h:330,foot:300},rock:{w:140,h:130,foot:106},bush:{w:160,h:145,foot:115},flowers:{w:150,h:125,foot:100},cabin:{w:400,h:355,foot:320},sign:{w:155,h:160,foot:140},gate:{w:290,h:190,foot:157},bridge:{w:340,h:240,foot:170},bench:{w:185,h:140,foot:115},wood:{w:140,h:100,foot:75}};
+export const ART:Record<SceneryKind,{w:number;h:number;foot:number}>={tree:{w:250,h:300,foot:270},goldTree:{w:250,h:300,foot:270},pine:{w:230,h:330,foot:300},rock:{w:140,h:130,foot:106},bush:{w:160,h:145,foot:115},flowers:{w:150,h:125,foot:100},cabin:{w:400,h:355,foot:320},sign:{w:155,h:160,foot:140},gate:{w:290,h:190,foot:157},bridge:{w:340,h:240,foot:170},bench:{w:185,h:140,foot:115},wood:{w:140,h:100,foot:75},npc:{w:120,h:180,foot:160}};
 function foliage(c:C,gold=false,pine=false){
  const r=random(gold?52:43);ellipse(c,8,5,73,24,'#395a3928');
  const bark=c.createLinearGradient(-14,0,20,0);bark.addColorStop(0,'#786041');bark.addColorStop(.6,'#a08658');bark.addColorStop(1,'#67513d');
@@ -44,7 +44,7 @@ function cabin(c:C){
 }
 function drawObject(c:C,kind:SceneryKind){
  if(kind==='tree'||kind==='goldTree'||kind==='pine'){foliage(c,kind==='goldTree',kind==='pine');return;}
- if(kind==='cabin'){cabin(c);return;}
+ if(kind==='cabin'){cabin(c);return;} if(kind==='npc'){ellipse(c,0,4,30,10,'#40593b2b');ellipse(c,0,-116,23,25,'#d8ae86');ellipse(c,-7,-121,18,18,'#604a3e');ellipse(c,0,-70,32,48,'#8fa273');polygon(c,[[-28,-89],[28,-89],[22,-27],[-22,-27]],'#91a878');line(c,[[-15,-29],[-18,0]],'#665b4d',8);line(c,[[15,-29],[18,0]],'#665b4d',8);ellipse(c,-8,-118,2,2,'#4d443c');ellipse(c,8,-118,2,2,'#4d443c');return;}
  ellipse(c,4,5,kind==='bridge'?138:kind==='gate'?113:50,kind==='bridge'?32:17,'#45633c26');
  if(kind==='rock'){
   polygon(c,[[-46,-6],[-40,-41],[-9,-63],[25,-59],[50,-28],[42,3],[7,10]],'#8e9d87');polygon(c,[[-40,-41],[-9,-63],[25,-59],[13,-30],[-14,-24]],'#c3c7ac');polygon(c,[[13,-30],[25,-59],[50,-28],[42,3],[8,7]],'#a5b099');line(c,[[-36,-13],[-18,-8]],'#72865c',5);ellipse(c,25,-5,14,5,'#839657');
