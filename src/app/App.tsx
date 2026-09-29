@@ -86,7 +86,6 @@ export function App() {
       </div>
       {state.feedback?.energy ? <span key={state.feedback.serial} className={`energy-change ${state.feedback.energy>0?'gain':''}`}>{state.feedback.energy>0?'+':''}{state.feedback.energy} <Icon name="energy" size={12}/></span> : null}
       <div className="resource-strip" aria-label="Recursos">{(['wood','stone','fiber'] as const).map(id=><span key={id}><Icon name={id==='fiber'?'leaf':id} size={13}/><b>{data.inventory[id]}</b></span>)}</div>
-      <div className="location"><span />{zoneName}<span /></div>
     </header>
 
     <div className={`toast ${toast ? 'visible' : ''}`} role="status" aria-live="polite">{notice}</div>
