@@ -64,7 +64,7 @@ export const actions = {
   setZone(zoneName: string) { if (gameStore.getState().zoneName !== zoneName) gameStore.setState({ zoneName }); },
   visitPlace(id: string) {
     if (!findWorldObject(id)?.interaction || gameStore.getState().data.maps[MEADOW.id].visitedPlaces.includes(id)) return;
-    commit(data => { data.maps[MEADOW.id].visitedPlaces.push(id); });
+    commit(data => { data.maps[MEADOW.id].visitedPlaces.push(id); syncQuests(data); });
   },
   setAnchor(anchor: { x: number; y: number } | null) {
     const previous = gameStore.getState().anchor;
@@ -85,6 +85,7 @@ export const actions = {
     const data = structuredClone(state.data);
     const result = interact(data, id, Date.now());
     if ('error' in result) { notify(result.error); return; }
+    syncQuests(data);
     commit(draft => Object.assign(draft, data));
     gameStore.setState({ feedback: { ...result.feedback, serial: (state.feedback?.serial ?? 0) + 1 } });
     notify(result.message);
