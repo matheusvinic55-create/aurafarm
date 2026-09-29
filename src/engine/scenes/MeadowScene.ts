@@ -58,7 +58,10 @@ export class MeadowScene extends Phaser.Scene {
           const doubleTap = this.lastObjectTap.id === object.id && now - this.lastObjectTap.at <= 360;
           this.lastObjectTap = { id: object.id, at: now };
           gameBridge.select(object.id);
-          if (doubleTap && (object.obstacleType || object.id === 'meadow-berries')) {
+          // Removable obstacles are direct world actions: one tap walks over and clears/works them.
+          // This keeps decorative scenery passive while making every blocker obviously functional.
+          if (object.obstacleType || object.id === 'meadow-berries') {
+            if (!doubleTap && object.id === 'meadow-berries') return;
             this.pendingAction = object.id;
             const destination = this.navigation.safePosition(object.interaction!.approach);
             const route = this.navigation.findPath(this.explorer.position, destination);
