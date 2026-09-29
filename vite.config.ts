@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   plugins: [react(), VitePWA({
-    registerType: 'prompt',
+    registerType: 'autoUpdate',
     includeAssets: ['icons/*.png', 'favicon.svg'],
     manifest: {
       id: '/', name: 'AuraFarm', short_name: 'AuraFarm', lang: 'pt-BR',
@@ -20,7 +20,7 @@ export default defineConfig({
     workbox: {
       globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
       maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
-      navigateFallback: '/index.html', cleanupOutdatedCaches: true
+      navigateFallback: '/index.html', cleanupOutdatedCaches: true, skipWaiting: true, clientsClaim: true
     }
   })],
   build: { target: 'es2022', chunkSizeWarningLimit: 1600 }
