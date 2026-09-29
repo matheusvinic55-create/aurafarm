@@ -4,5 +4,8 @@ export const gameBridge = {
   snapshot: () => gameStore.getState(),
   subscribe: gameStore.subscribe,
   select: actions.selectObject,
-  move: actions.move
+  move: actions.move,
+  notify: actions.notify,
+  zone: actions.setZone,
+  visit: actions.visitPlace
 };

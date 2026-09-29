@@ -4,8 +4,9 @@ import { Icon } from './Icon';
 export function Sheet({ title, close, children }: { title: string; close: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    ref.current?.showModal();
-    return () => ref.current?.close();
+    const dialog = ref.current;
+    dialog?.showModal();
+    return () => dialog?.close();
   }, []);
   return <dialog ref={ref} className="sheet" aria-labelledby="sheet-title" onCancel={close} onClick={event => { if (event.target === event.currentTarget) close(); }}>
     <div className="sheet-inner">

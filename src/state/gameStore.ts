@@ -6,16 +6,19 @@ import { findObject } from '../domain/objects/catalog';
 import { gainXp } from '../domain/progression/progression';
 import type { Position } from '../domain/player/types';
 import type { GameSettings } from '../settings/types';
+import { normalizeWorld } from '../persistence/normalizeWorld';
+import { MEADOW, findWorldObject } from '../domain/maps/meadow';
+import { meadowNavigation } from '../domain/maps/navigation';
 import { audioService } from '../audio/audioService';
 
 interface GameState {
   data: SaveData; ready: boolean; fatal: string | null; selectedId: string | null;
-  saveStatus: 'saved' | 'error'; notice: string; noticeId: number;
+  zoneName: string; saveStatus: 'saved' | 'error'; notice: string; noticeId: number;
 }
 const adapter = new LocalStorageAdapter();
 export const gameStore = createStore<GameState>(() => ({
   data: newSave(), ready: false, fatal: null, selectedId: null,
-  saveStatus: 'saved', notice: '', noticeId: 0
+  zoneName: MEADOW.name, saveStatus: 'saved', notice: '', noticeId: 0
 }));
 
 function notify(notice: string) { gameStore.setState(state => ({ notice, noticeId: state.noticeId + 1 })); }
@@ -34,7 +37,7 @@ export const actions = {
     if (gameStore.getState().ready) return;
     try {
       const { data: stored, recovered } = adapter.load();
-      const data = stored ?? newSave();
+      const data = normalizeWorld(stored ?? newSave());
       data.energy = regenerate(data.energy, Date.now());
       adapter.save(data);
       gameStore.setState({ data, ready: true });
@@ -44,7 +47,13 @@ export const actions = {
     }
   },
   selectObject(id: string | null) { gameStore.setState({ selectedId: id }); },
-  move(position: Position) { commit(data => { data.player.position = position; }); },
+  move(position: Position) { if (!meadowNavigation().isWalkable(position)) return; commit(data => { data.player.position = { ...position }; }); },
+  notify,
+  setZone(zoneName: string) { if (gameStore.getState().zoneName !== zoneName) gameStore.setState({ zoneName }); },
+  visitPlace(id: string) {
+    if (!findWorldObject(id)?.interaction || gameStore.getState().data.maps[MEADOW.id].visitedPlaces.includes(id)) return;
+    commit(data => { data.maps[MEADOW.id].visitedPlaces.push(id); });
+  },
   collect(id: string) {
     const object = findObject(id);
     if (!object) return;
@@ -66,7 +75,7 @@ export const actions = {
   },
   eatBerry() {
     const { data } = gameStore.getState();
-    if (!data.inventory.berry) { notify('Toque na amoreira para colher um lanche.'); return; }
+    if (!data.inventory.berry) { notify('As próximas aventuras trarão novos lanches.'); return; }
     if (regenerate(data.energy, Date.now()).current >= data.energy.max) { notify('Sua energia está cheia. Guarde o lanche para depois.'); return; }
     commit(draft => { draft.inventory.berry -= 1; draft.energy = recoverEnergy(draft.energy, ENERGY.berryRecovery, Date.now()); });
     notify('Uma pausa gostosa. +10 de energia.');
@@ -87,7 +96,7 @@ export const actions = {
   receiveExternal(event: StorageEvent) {
     if (event.key !== SAVE_KEY || !event.newValue || !gameStore.getState().ready) return;
     try {
-      const data = decodeSave(event.newValue);
+      const data = normalizeWorld(decodeSave(event.newValue));
       const current = gameStore.getState().data;
       if (data.revision > current.revision || (data.revision === current.revision && data.savedAt > current.savedAt)) {
         gameStore.setState({ data, saveStatus: 'saved' });

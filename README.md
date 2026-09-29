@@ -1,4 +1,4 @@
-# AuraFarm — Etapa 01
+# AuraFarm — Etapa 02
 
 Jogo cozy independente para iPhone/PWA. Este repositório nasce do zero e não compartilha código, dados, credenciais ou infraestrutura com outros aplicativos.
 
@@ -17,13 +17,14 @@ Stack: React + TypeScript + Vite, Phaser 3.90, Zustand e Zod. O Phaser é carreg
 
 ## O que está implementado
 
-- Clareira provisória em tela cheia, personagem, movimento por toque, três pontos de coleta e HUD React.
-- Madeira custa 3 de energia; flores e amoras não custam. Objetos se renovam para permitir experimentar a base.
-- 160 pontos máximos, regeneração de 1 ponto/20 s por horário real, inclusive enquanto fechado; amora recupera 10.
-- Mochila, nível/experiência simples, configurações de som, resposta ao toque e redução de movimento.
-- Salvamento local automático, validado, versionado e com backup anterior. Uma gravação síncrona acontece em cada ação antes do retorno ao jogador.
-- PWA com manifest, ícones, precache offline, atualização mediante comando e recuperação de tamanho ao voltar ao app.
-- Interface em português, retrato prioritário, `100dvh`, safe areas, bloqueio de scroll/gestos acidentais na cena. Diálogos podem rolar internamente.
+- Propriedade explorável com caminhos, floresta, lago, casa, flores, cercas e duas passagens futuras: portão e ponte interrompida.
+- Personagem original com quatro orientações, animações de caminhada e repouso, movimento por toque e navegação A* com desvio de obstáculos.
+- Câmera suave, limitada ao mundo; profundidade por posição, transparência das copas e descarte visual fora do enquadramento.
+- Identificação e aproximação de árvores, pedras, arbustos e pontos de interesse, sem coleta completa nesta etapa.
+- HUD React compacto. Experiência prioritariamente **horizontal**, `100dvh`, safe areas e aviso para girar o iPhone; sem scroll da página.
+- Salvamento automático da posição realmente percorrida e dos lugares visitados. Saves da etapa 01 preservam progresso e recursos, reposicionando o personagem no novo mapa.
+- Energia, mochila, configurações e persistência da fundação preservadas. Caminhar e observar não gastam energia.
+- PWA offline após a primeira abertura, atualização mediante comando e recuperação ao retornar ao aplicativo.
 
 ## Arquitetura
 
@@ -35,13 +36,19 @@ Stack: React + TypeScript + Vite, Phaser 3.90, Zustand e Zod. O Phaser é carreg
 | `src/domain/player` | Identidade local e posição |
 | `src/domain/inventory`, `resources` | Quantidades e catálogo de recursos |
 | `src/domain/energy`, `progression` | Regras puras de energia e experiência |
-| `src/domain/maps`, `objects` | Mapa de teste, interações e persistência dos pontos de coleta |
+| `src/domain/maps`, `objects` | Definição do mundo, terreno navegável, sólidos, áreas bloqueadas e interações |
 | `src/domain/quests`, `characters` | Contratos iniciais para missões, NPCs e narrativa |
 | `src/domain/economy`, `farming` | Contratos para moedas, construções e cultivos; sem sistemas complexos nesta etapa |
 | `src/persistence` | Schema v1, migrações futuras, adaptador local e porta de sincronização remota |
 | `src/audio`, `settings` | Serviço de áudio desbloqueado por gesto e preferências |
 
-O React não renderiza o mundo. O Phaser não acessa armazenamento nem componentes React: usa `engine/bridge.ts`. Comandos validam ações e alteram os dados; a cena observa o estado. Coordenadas de mundo são separadas da viewport e o depth sorting já usa Y. Projeção isométrica, câmera explorável e sprites de atlas entram na etapa 02 sem trocar os dados de jogo.
+O React não renderiza o mundo. O Phaser não acessa armazenamento nem componentes React: usa `engine/bridge.ts`. Comandos validam ações e alteram os dados; a cena observa o estado. Coordenadas de mundo são separadas da viewport e o depth sorting já usa Y. O mundo usa perspectiva elevada com volumes e sobreposição. Arte procedural está isolada em `engine/rendering/worldArt.ts`; personagem em `engine/characters/Explorer.ts`; enquadramento em `engine/camera/WorldCamera.ts`. Texturas definitivas e novas animações podem substituir essas implementações sem alterar os dados do jogador.
+
+## Navegação e expansão do mundo
+
+`domain/maps/types.ts` separa limites caminháveis, formas de colisão, áreas bloqueadas, cenário e pontos de interação. `meadow.ts` é a definição declarativa desta primeira propriedade; as passagens futuras continuam sólidas. `NavigationGrid` calcula rotas sobre uma malha de 24 unidades, considera o raio do personagem e impede cortes diagonais em obstáculos. A cena valida cada segmento executado, independentemente da rota calculada.
+
+A revisão do mundo é independente da versão do save. `normalizeWorld.ts` migra posições antigas e corrige posições fora da região alcançável; valores inválidos não apagam inventário ou progressão. A posição é salva durante o percurso, na chegada e ao ocultar a página. Destinos ainda não percorridos nunca são persistidos como posição do jogador.
 
 ## Persistência e limites
 
@@ -55,7 +62,7 @@ No iPhone, primeiro abra online e adicione à Tela de Início pelo menu Comparti
 
 ## GitHub → Vercel
 
-Crie um repositório **novo e privado** chamado `aurafarm`, com branch `main`, e importe-o como projeto **novo** na Vercel. Não vincule nenhum projeto existente.
+Repositório existente: `matheusvinic55-create/aurafarm`, branch `main`. Projeto Vercel existente: `aurafarm`. Produção: https://aurafarm-psi.vercel.app/. As próximas etapas devem atualizar exclusivamente esses mesmos projetos.
 
 - Framework: Vite
 - Instalação: `npm ci`
@@ -70,7 +77,6 @@ Crie um repositório **novo e privado** chamado `aurafarm`, com branch `main`, e
 
 ## Próximas etapas (não implementadas)
 
-2. Mundo principal, personagem definitivo, câmera e exploração visual.
 3. Obstáculos, regras completas de coleta e desbloqueio de áreas.
 4. Fazenda, plantações, receitas, produção e inventário completo.
 5. Missões, progressão completa, personagens e narrativa.

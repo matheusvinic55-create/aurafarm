@@ -9,7 +9,7 @@ export default defineConfig({
     manifest: {
       id: '/', name: 'AuraFarm', short_name: 'AuraFarm', lang: 'pt-BR',
       description: 'Um pequeno refúgio para explorar no seu ritmo.',
-      start_url: '/', scope: '/', display: 'standalone', orientation: 'portrait',
+      start_url: '/', scope: '/', display: 'standalone', orientation: 'landscape',
       background_color: '#e7ecd9', theme_color: '#e7ecd9',
       icons: [
         { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

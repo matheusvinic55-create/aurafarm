@@ -1,109 +1,85 @@
 import Phaser from 'phaser';
 import { gameBridge } from '../bridge';
-import { MEADOW } from '../../domain/maps/meadow';
-import { OBJECTS } from '../../domain/objects/catalog';
-import { drawTerrain, drawCabin, drawPlayer, drawTree, drawResource } from '../rendering/art';
+import { MEADOW, findWorldObject } from '../../domain/maps/meadow';
+import type { SceneryObject } from '../../domain/maps/types';
+import type { Position } from '../../domain/player/types';
+import { meadowNavigation } from '../../domain/maps/navigation';
+import { contains } from '../navigation/NavigationGrid';
+import { createWorldTextures, drawWorldGround, ART } from '../rendering/worldArt';
+import { Explorer } from '../characters/Explorer';
+import { WorldCamera } from '../camera/WorldCamera';
 
-export class MeadowScene extends Phaser.Scene {
-  private player!: Phaser.GameObjects.Container;
-  private shadow!: Phaser.GameObjects.Ellipse;
-  private selection!: Phaser.GameObjects.Ellipse;
-  private destination!: Phaser.GameObjects.Ellipse;
-  private nodes = new Map<string, Phaser.GameObjects.Container>();
-  private target = { ...MEADOW.spawn } as { x: number; y: number };
-  private walking = false;
-  private pollen: Phaser.GameObjects.Arc[] = [];
-  private unsubscribe?: () => void;
-  private lastRefresh = 0;
-  constructor() { super('meadow'); }
-
-  create() {
-    this.cameras.main.setBackgroundColor('#e7ecd9');
-    drawTerrain(this);
-    [[170,630,0.9,0],[183,507,1.1,1],[274,421,1,0],[407,428,0.85,0],[533,462,1.1,1],[667,538,0.95,0],[754,651,0.85,1],[119,800,0.8,0],[157,951,0.9,1],[294,1068,0.8,0],[597,1079,0.85,0],[745,1027,0.75,1]].forEach(([x,y,s,k]) => drawTree(this,x,y,s,k));
-    drawCabin(this);
-    this.selection = this.add.ellipse(0, 0, 115, 49).setStrokeStyle(3, 0xfff9de, 0.95).setDepth(1).setVisible(false);
-    for (const object of OBJECTS) {
-      const ring = this.add.ellipse(0, 6, 89, 34, 0xfaf4d9, 0.42).setStrokeStyle(1.5, 0xfaf4d9, 0.7);
-      const art = drawResource(this, object.kind);
-      const node = this.add.container(object.x, object.y, [ring, art]).setDepth(object.y);
-      node.setSize(130, 130).setInteractive(new Phaser.Geom.Circle(65, 65, 65), Phaser.Geom.Circle.Contains);
-      node.on('pointerdown', (_pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
-        event.stopPropagation();
-        gameBridge.select(object.id);
-      });
-      this.nodes.set(object.id, node);
-    }
-    const state = gameBridge.snapshot();
-    this.target = { ...state.data.player.position };
-    this.shadow = this.add.ellipse(this.target.x, this.target.y + 2, 46, 18, 0x53664b, 0.19);
-    this.player = drawPlayer(this).setPosition(this.target.x, this.target.y).setDepth(this.target.y + 1);
-    this.destination = this.add.ellipse(0, 0, 25, 11).setStrokeStyle(2, 0xfff9dd, 0.85).setVisible(false).setDepth(0);
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
-      if (over.length > 0) return;
-      const point = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
-      const area = MEADOW.walkArea;
-      const ellipse = new Phaser.Geom.Ellipse(area.x, area.y, area.width, area.height);
-      if (!Phaser.Geom.Ellipse.Contains(ellipse, point.x, point.y)) { gameBridge.select(null); return; }
-      // The pool is scenery, not walkable. More elaborate navigation is stage 02.
-      if (Phaser.Geom.Ellipse.Contains(new Phaser.Geom.Ellipse(678, 864, 195, 295), point.x, point.y)) return;
-      gameBridge.select(null);
-      this.target = { x: point.x, y: point.y };
-      this.walking = true;
-      this.destination.setPosition(point.x, point.y).setVisible(true);
-      // Persist destination immediately, so closing mid-walk never loses the tap.
-      gameBridge.move(this.target);
-    });
-    for (let i = 0; i < 9; i++) this.pollen.push(this.add.circle(0, 0, 2 + i % 2, 0xffffe8, 0.65).setDepth(2000));
-    this.unsubscribe = gameBridge.subscribe((next, previous) => {
-      if (next.data.player.position !== previous.data.player.position && !this.walking) {
-        this.target = { ...next.data.player.position };
-        this.player.setPosition(this.target.x, this.target.y);
-      }
-      this.refreshObjects();
-    });
-    this.scale.on('resize', this.resizeScene, this);
-    this.events.once('shutdown', () => { this.unsubscribe?.(); this.scale.off('resize', this.resizeScene, this); });
-    this.resizeScene(); this.refreshObjects();
+export class MeadowScene extends Phaser.Scene{
+ private explorer!:Explorer;private worldCamera!:WorldCamera;
+ private navigation=meadowNavigation();private route:Position[]=[];private waypoint=0;
+ private scenery:{data:SceneryObject;image:Phaser.GameObjects.Image}[]=[];
+ private ring!:Phaser.GameObjects.Ellipse;private destination!:Phaser.GameObjects.Ellipse;
+ private unsubscribe?:()=>void;private saving=false;private lastSave=0;private lastCull=0;
+ private motes:Phaser.GameObjects.Arc[]=[];private selected:string|null=null;
+ private hide=()=>{if(document.hidden)this.checkpoint();};private pageHide=()=>this.checkpoint();
+ constructor(){super('meadow');}
+ create(){
+  createWorldTextures(this);drawWorldGround(this);this.cameras.main.setBackgroundColor('#9fbb79');
+  for(const object of MEADOW.objects){
+   const spec=ART[object.kind],image=this.add.image(object.x,object.y,`world-${object.kind}`).setOrigin(.5,spec.foot/spec.h).setScale(object.scale).setDepth(object.y);
+   if(object.interaction){image.setInteractive({useHandCursor:true});image.on('pointerup',(pointer:Phaser.Input.Pointer,_x:number,_y:number,event:Phaser.Types.Input.EventData)=>{event.stopPropagation();if(pointer.getDistance()>15)return;gameBridge.select(object.id);});}
+   this.scenery.push({data:object,image});
   }
-
-  private resizeScene() {
-    const { width, height } = this.scale;
-    const zoom = Math.min(width / 825, Math.max(200, height - 140) / 960);
-    this.cameras.main.setZoom(zoom).centerOn(450, 733);
+  const position=this.navigation.safePosition(gameBridge.snapshot().data.player.position);
+  this.explorer=new Explorer(this,position);this.worldCamera=new WorldCamera(this.cameras.main,MEADOW,this.explorer.root);
+  this.ring=this.add.ellipse(0,0,90,36).setStrokeStyle(3,0xfff1bb,.95).setVisible(false);
+  this.destination=this.add.ellipse(0,0,23,12).setStrokeStyle(2,0xfff5cb,.85).setVisible(false).setDepth(-1);
+  for(let i=0;i<7;i++)this.motes.push(this.add.circle(0,0,2,0xfff3b8,.7).setDepth(3000));
+  this.input.on('pointerup',(pointer:Phaser.Input.Pointer,over:Phaser.GameObjects.GameObject[])=>{
+   if(over.length||pointer.getDistance()>15||document.querySelector('dialog[open]'))return;
+   const p=this.cameras.main.getWorldPoint(pointer.x,pointer.y);
+   if(!this.navigation.isWalkable(p)){gameBridge.notify('Esse trecho ainda está fechado. Experimente seguir pela clareira.');return;}
+   const route=this.navigation.findPath(this.explorer.position,p);
+   if(!route){gameBridge.notify('Ainda não há passagem até ali.');return;}
+   gameBridge.select(null);this.beginRoute(route,p);
+  });
+  this.unsubscribe=gameBridge.subscribe((next,previous)=>{
+   if(next.selectedId!==previous.selectedId)this.selectObject(next.selectedId);
+   const a=next.data.player.position,b=previous.data.player.position;
+   if(!this.saving&&(a.x!==b.x||a.y!==b.y)){this.route=[];this.explorer.setPosition(this.navigation.safePosition(a));this.destination.setVisible(false);}
+   if(next.data.settings.reducedMotion!==previous.data.settings.reducedMotion)this.worldCamera.setReducedMotion(next.data.settings.reducedMotion);
+  });
+  this.scale.on('resize',this.resizeScene,this);document.addEventListener('visibilitychange',this.hide);window.addEventListener('pagehide',this.pageHide);
+  this.events.once('shutdown',()=>{this.checkpoint();this.unsubscribe?.();this.scale.off('resize',this.resizeScene,this);document.removeEventListener('visibilitychange',this.hide);window.removeEventListener('pagehide',this.pageHide);this.scenery=[];this.motes=[];});
+  this.resizeScene();this.worldCamera.setReducedMotion(gameBridge.snapshot().data.settings.reducedMotion);this.checkpoint();
+ }
+ private resizeScene(){if(this.worldCamera){this.worldCamera.resize(this.scale.width,this.scale.height);this.worldCamera.setReducedMotion(gameBridge.snapshot().data.settings.reducedMotion);}}
+ private beginRoute(route:Position[],destination:Position){this.route=route;this.waypoint=0;this.destination.setPosition(destination.x,destination.y).setVisible(true);}
+ private selectObject(id:string|null){
+  this.selected=id;const object=id?findWorldObject(id):undefined;
+  if(!object?.interaction){this.ring.setVisible(false);return;}
+  this.ring.setPosition(object.x,object.y+4).setSize(Math.min(180,ART[object.kind].w*.65*object.scale),40).setDepth(object.y-.5).setVisible(true);
+  const destination=this.navigation.safePosition(object.interaction.approach);
+  const route=this.navigation.findPath(this.explorer.position,destination);
+  if(route)this.beginRoute(route,destination);else gameBridge.notify('Encontre uma passagem mais próxima para observar esse lugar.');
+ }
+ private checkpoint(){
+  if(!this.explorer)return;const p=this.explorer.position;
+  const saved=gameBridge.snapshot().data.player.position;
+  if(Math.hypot(saved.x-p.x,saved.y-p.y)<.1)return;
+  this.saving=true;gameBridge.move(p);this.saving=false;
+ }
+ update(time:number,delta:number){
+  if(!this.explorer)return;const before=this.explorer.position;let budget=185*Math.min(delta,40)/1000;
+  while(this.waypoint<this.route.length&&budget>0){const p=this.explorer.position,target=this.route[this.waypoint],distance=Math.hypot(target.x-p.x,target.y-p.y);
+   const step=Math.min(budget,distance),next=distance<.001?target:{x:p.x+(target.x-p.x)*step/distance,y:p.y+(target.y-p.y)*step/distance};
+   if(!this.navigation.segmentClear(p,next)){this.route=[];this.destination.setVisible(false);this.checkpoint();break;}
+   this.explorer.setPosition(next);budget-=step;
+   if(distance<=step+.01){this.waypoint++;if(this.waypoint===this.route.length){this.destination.setVisible(false);this.checkpoint();if(this.selected)gameBridge.visit(this.selected);}}
   }
-
-  private refreshObjects() {
-    const state = gameBridge.snapshot();
-    for (const object of OBJECTS) {
-      const ready = (state.data.objects[object.id]?.availableAt ?? 0) <= Date.now();
-      this.nodes.get(object.id)?.setAlpha(ready ? 1 : 0.48);
-    }
-    const selected = OBJECTS.find(object => object.id === state.selectedId);
-    this.selection.setVisible(!!selected);
-    if (selected) this.selection.setPosition(selected.x, selected.y + 7).setDepth(selected.y - 1);
+  const p=this.explorer.position,reduced=gameBridge.snapshot().data.settings.reducedMotion;
+  this.explorer.animate(p.x-before.x,p.y-before.y,delta,time,reduced);
+  if(time-this.lastSave>1200){this.checkpoint();this.lastSave=time;}
+  if(time-this.lastCull>140){
+   const view=this.cameras.main.worldView;
+   for(const {data,image}of this.scenery){const visible=data.x>view.x-300&&data.x<view.right+300&&data.y>view.y-50&&data.y<view.bottom+380;image.setVisible(visible);if(visible){const canopy=['tree','pine','goldTree'].includes(data.kind);image.setAlpha(canopy&&p.y<data.y&&p.y>data.y-210*data.scale&&Math.abs(p.x-data.x)<75*data.scale ? .56 : 1);}}
+   const zone=MEADOW.zones.find(zone=>contains(zone.bounds,p));gameBridge.zone(zone?.name??MEADOW.name);this.lastCull=time;
   }
-
-  update(time: number, delta: number) {
-    if (!this.player) return;
-    const reduced = gameBridge.snapshot().data.settings.reducedMotion;
-    if (this.walking) {
-      const distance = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.target.x, this.target.y);
-      const step = reduced ? distance : 230 * Math.min(delta, 40) / 1000;
-      if (distance <= step) {
-        this.player.setPosition(this.target.x, this.target.y); this.walking = false; this.destination.setVisible(false);
-      } else {
-        this.player.x += (this.target.x - this.player.x) / distance * step;
-        this.player.y += (this.target.y - this.player.y) / distance * step;
-      }
-      this.player.setDepth(this.player.y + 1);
-      (this.player.first as Phaser.GameObjects.Graphics).y = reduced ? 0 : Math.sin(time / 65) * 2;
-    } else (this.player.first as Phaser.GameObjects.Graphics).y = reduced ? 0 : Math.sin(time / 700) * 1.1;
-    this.shadow.setPosition(this.player.x, this.player.y + 2).setDepth(this.player.y - 1);
-    this.pollen.forEach((dot, i) => {
-      dot.setVisible(!reduced);
-      dot.setPosition(200 + (i * 91 + time * 0.011) % 535, 415 + (i * 71) % 570 + Math.sin(time / 1500 + i) * 16);
-    });
-    if (time - this.lastRefresh > 500) { this.refreshObjects(); this.lastRefresh = time; }
-  }
+  this.motes.forEach((dot,i)=>{dot.setVisible(!reduced);dot.setPosition(p.x-290+(i*101+time*.006)%600,p.y-170+(i*73)%330+Math.sin(time/1600+i)*12);});
+ }
 }
