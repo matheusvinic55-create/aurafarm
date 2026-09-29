@@ -66,12 +66,12 @@ export class MeadowScene extends Phaser.Scene {
     this.input.addPointer(1);
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       this.gesture.lastX = pointer.x; this.gesture.lastY = pointer.y;
-      const active = this.input.manager.pointers.filter(p => p.isDown);
+      const active = [this.input.pointer1, this.input.pointer2].filter((p): p is Phaser.Input.Pointer => Boolean(p?.isDown));
       if (active.length >= 2) this.gesture.pinchDistance = Phaser.Math.Distance.Between(active[0].x, active[0].y, active[1].x, active[1].y);
     });
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (!pointer.isDown || document.querySelector('dialog[open]')) return;
-      const active = this.input.manager.pointers.filter(p => p.isDown);
+      const active = [this.input.pointer1, this.input.pointer2].filter((p): p is Phaser.Input.Pointer => Boolean(p?.isDown));
       if (active.length >= 2) {
         const distance = Phaser.Math.Distance.Between(active[0].x, active[0].y, active[1].x, active[1].y);
         if (this.gesture.pinchDistance > 0 && distance > 0) {
@@ -90,7 +90,7 @@ export class MeadowScene extends Phaser.Scene {
     });
     this.input.on('pointerup', (pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) => {
       const wasGesture = this.gesture.dragging || pointer.getDistance() > 15;
-      if (!this.input.manager.pointers.some(p => p.isDown)) { this.gesture.dragging = false; this.gesture.pinchDistance = 0; }
+      if (![this.input.pointer1, this.input.pointer2].some(p => p?.isDown)) { this.gesture.dragging = false; this.gesture.pinchDistance = 0; }
       if(over.length || wasGesture || document.querySelector('dialog[open]')) return;
       const p = this.cameras.main.getWorldPoint(pointer.x,pointer.y);
       if(!this.navigation.isWalkable(p)) { gameBridge.notify('Esse trecho ainda está fechado. Siga pela clareira ou limpe os obstáculos.'); return; }
