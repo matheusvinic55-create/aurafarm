@@ -52,15 +52,13 @@ export class MeadowScene extends Phaser.Scene {
       const image = this.add.image(object.x, object.y, `world-${object.kind}`).setOrigin(.5, spec.foot/spec.h).setScale(object.scale).setDepth(object.y);
       if (object.interaction) {
         image.setInteractive({ useHandCursor: true });
-        image.on('pointerup', (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
-          event.stopPropagation();
-          if (pointer.getDistance()>15 || !objectPresent(object, gameBridge.snapshot().data)) return;
+        image.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+          if (this.gesture.dragging || this.gesture.pinchDistance > 0 || pointer.getDistance()>15 || !objectPresent(object, gameBridge.snapshot().data)) return;
           const now = this.time.now;
           const doubleTap = this.lastObjectTap.id === object.id && now - this.lastObjectTap.at <= 360;
           this.lastObjectTap = { id: object.id, at: now };
           gameBridge.select(object.id);
           if (doubleTap && (object.obstacleType || object.id === 'meadow-berries')) {
-            this.worldCamera.resumeFollow();
             this.pendingAction = object.id;
             const destination = this.navigation.safePosition(object.interaction!.approach);
             const route = this.navigation.findPath(this.explorer.position, destination);
@@ -82,12 +80,18 @@ export class MeadowScene extends Phaser.Scene {
     this.ring = this.add.ellipse(0,0,90,36).setStrokeStyle(3,0xfff1bb,.95).setVisible(false);
     this.destination = this.add.ellipse(0,0,23,12).setStrokeStyle(2,0xfff5cb,.85).setVisible(false).setDepth(-1);
     for(let i=0;i<7;i++) this.motes.push(this.add.circle(0,0,2,0xfff3b8,.7).setDepth(3000));
-    // One finger pans the world; two fingers pinch to zoom. Add a second touch pointer explicitly.
+    // A tap only walks. Once a drag/pinch starts, it cannot become a walking tap.
     this.input.addPointer(1);
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       this.gesture.lastX = pointer.x; this.gesture.lastY = pointer.y;
       const active = [this.input.pointer1, this.input.pointer2].filter((p): p is Phaser.Input.Pointer => Boolean(p?.isDown));
-      if (active.length >= 2) this.gesture.pinchDistance = Phaser.Math.Distance.Between(active[0].x, active[0].y, active[1].x, active[1].y);
+      if (active.length >= 2) {
+        this.gesture.dragging = true;
+        this.gesture.pinchDistance = Phaser.Math.Distance.Between(active[0].x, active[0].y, active[1].x, active[1].y);
+      } else {
+        this.gesture.dragging = false;
+        this.gesture.pinchDistance = 0;
+      }
     });
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (!pointer.isDown || document.querySelector('dialog[open]')) return;
@@ -101,8 +105,13 @@ export class MeadowScene extends Phaser.Scene {
         this.gesture.pinchDistance = distance;
         return;
       }
+      // Releasing one finger after a pinch must not jump the camera or move the character.
+      if (this.gesture.pinchDistance > 0) {
+        this.gesture.lastX = pointer.x; this.gesture.lastY = pointer.y;
+        return;
+      }
       const dx = pointer.x - this.gesture.lastX, dy = pointer.y - this.gesture.lastY;
-      if (pointer.getDistance() > 12) {
+      if (this.gesture.dragging || pointer.getDistance() > 15) {
         this.worldCamera.panByScreen(dx, dy);
         this.gesture.dragging = true;
       }
@@ -116,7 +125,7 @@ export class MeadowScene extends Phaser.Scene {
       if(!this.navigation.isWalkable(p)) { gameBridge.notify('Esse trecho ainda está fechado. Siga pela clareira ou limpe os obstáculos.'); return; }
       const route = this.navigation.findPath(this.explorer.position,p);
       if(!route) { gameBridge.notify('Ainda não há passagem até ali.'); return; }
-      gameBridge.select(null); this.farmQueue=[]; this.farmActive=false; this.pendingAction=null; this.worldCamera.resumeFollow(); this.beginRoute(route,p);
+      gameBridge.select(null); this.farmQueue=[]; this.farmActive=false; this.pendingAction=null; this.beginRoute(route,p);
     });
     this.unsubscribe = gameBridge.subscribe((next, previous) => {
       if (navigationKey(next.data)!==navigationKey(previous.data)) {
@@ -151,7 +160,6 @@ export class MeadowScene extends Phaser.Scene {
         this.farmLayer.feedback(event.objectId, next.data.settings.reducedMotion);
         this.effects.play(event, findFarmTarget(event.objectId) ?? item?.data??this.explorer.position, item?.image, next.data.settings.reducedMotion);
       }
-      if(next.data.settings.reducedMotion!==previous.data.settings.reducedMotion) this.worldCamera.setReducedMotion(next.data.settings.reducedMotion);
     });
     this.scale.on('resize',this.resizeScene,this);
     document.addEventListener('visibilitychange',this.hide); window.addEventListener('pagehide',this.pageHide);
@@ -166,7 +174,6 @@ export class MeadowScene extends Phaser.Scene {
   private resizeScene() {
     if(!this.worldCamera) return;
     this.worldCamera.resize(this.scale.width,this.scale.height);
-    this.worldCamera.setReducedMotion(gameBridge.snapshot().data.settings.reducedMotion);
   }
   private beginRoute(route: Position[], destination: Position) {
     this.route=route; this.waypoint=0; this.destination.setPosition(destination.x,destination.y).setVisible(true);

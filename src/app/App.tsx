@@ -126,7 +126,7 @@ export function App() {
         <p className="footnote">Cada pequeno caminho aberto guarda uma descoberta.</p>
       </>}
       {panel === 'help' && <>
-        <p className="sheet-intro">Deite o iPhone e explore a propriedade no seu ritmo. A câmera acompanha você.</p>
+        <p className="sheet-intro">Deite o iPhone e explore no seu ritmo. Toque para caminhar; arraste para mover a câmera.</p>
         <ol className="help-list"><li>Toque no chão livre para caminhar. Seu personagem contorna os obstáculos.</li><li>Dê dois toques nos galhos, pedras ou arbustos para se aproximar e limpar. Arraste para mover a câmera; use dois dedos para ajustar o zoom.</li><li>Limpe os três bloqueios da trilha ao norte para abrir o Recanto das Samambaias. Colete amoras de graça e coma na mochila para recuperar energia.</li><li>A horta fica ao sul da casa. Toque no canteiro e escolha uma semente. Regar é opcional; plantas e receitas continuam crescendo e preparando fora do jogo.</li></ol>
         <div className="find-list"><button onClick={() => focusResource(PLOTS[0].id)}><Icon name="sprout" size={18}/>Ir para a horta<Icon name="chevron" size={16}/></button>{WORLD_OBJECTS.filter(item => ['trail-branches', 'trail-log', 'trail-thicket', 'meadow-berries', 'fern-bench'].includes(item.id) && objectPresent(item,data)).map(item => <button key={item.id} onClick={() => focusResource(item.id)}><Icon name={item.interaction?.future ? 'compass' : 'leaf'} size={18} />{item.interaction?.name}<Icon name="chevron" size={16} /></button>)}</div>
         <p className="install-note"><strong>Leve a clareira com você</strong>No Safari, toque em Compartilhar e em “Adicionar à Tela de Início”. Depois da primeira abertura completa, o jogo também pode abrir sem internet.</p>
