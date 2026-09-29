@@ -30,6 +30,7 @@ export class MeadowScene extends Phaser.Scene {
   private motes: Phaser.GameObjects.Arc[] = [];
   private selected: string | null = null;
   private pendingAction: string | null = null;
+  private lastObjectTap = { id: '', at: 0 };
   private gesture = { dragging: false, lastX: 0, lastY: 0, pinchDistance: 0 };
   private hide = () => { if (document.hidden) this.checkpoint(); };
   private pageHide = () => this.checkpoint();
@@ -47,7 +48,18 @@ export class MeadowScene extends Phaser.Scene {
         image.on('pointerup', (pointer: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
           event.stopPropagation();
           if (pointer.getDistance()>15 || !objectPresent(object, gameBridge.snapshot().data)) return;
+          const now = this.time.now;
+          const doubleTap = this.lastObjectTap.id === object.id && now - this.lastObjectTap.at <= 360;
+          this.lastObjectTap = { id: object.id, at: now };
           gameBridge.select(object.id);
+          if (doubleTap && (object.obstacleType || object.id === 'meadow-berries')) {
+            this.worldCamera.resumeFollow();
+            this.pendingAction = object.id;
+            const destination = this.navigation.safePosition(object.interaction!.approach);
+            const route = this.navigation.findPath(this.explorer.position, destination);
+            if (route) this.beginRoute(route, destination);
+            else { this.pendingAction = null; gameBridge.notify('Ainda não há passagem até ali.'); }
+          }
         });
       }
       image.setVisible(objectPresent(object, gameBridge.snapshot().data));
