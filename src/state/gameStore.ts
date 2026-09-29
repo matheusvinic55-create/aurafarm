@@ -15,6 +15,8 @@ import { normalizeWorld } from '../persistence/normalizeWorld';
 import { MEADOW, findWorldObject } from '../domain/maps/meadow';
 import { meadowNavigation } from '../domain/maps/navigation';
 import { audioService } from '../audio/audioService';
+import { claimQuest as claimQuestReward, storyFlag, syncQuests } from '../domain/quests/system';
+import { characterById } from '../domain/characters/catalog';
 
 interface GameState {
   data: SaveData; ready: boolean; fatal: string | null; selectedId: string | null;
@@ -48,6 +50,7 @@ export const actions = {
       const { data: stored, recovered } = adapter.load();
       const data = normalizeWorld(stored ?? newSave());
       data.energy = regenerate(data.energy, Date.now());
+      syncQuests(data);
       adapter.save(data);
       gameStore.setState({ data, ready: true });
       if (recovered) notify('Seu progresso foi recuperado da cópia local.');
@@ -100,11 +103,28 @@ export const actions = {
     const data = structuredClone(state.data);
     const result = performFarmCommand(data, command, Date.now());
     if ('error' in result) { notify(result.error); return; }
+    if (command.kind === 'harvest') storyFlag(data, 'harvest:' + command.targetId);
+    if (command.kind === 'collect') storyFlag(data, 'production:' + command.targetId + ':' + Date.now());
+    syncQuests(data);
     commit(draft => Object.assign(draft, data));
     gameStore.setState({ feedback: { ...result.feedback, serial: (state.feedback?.serial ?? 0) + 1 } });
     notify(result.message);
     audioService.collect(data.settings.sound);
     if (data.settings.haptics) navigator.vibrate?.(15);
+  },
+  talkCharacter(id: string) {
+    if (!characterById(id)) return;
+    commit(data => {
+      data.characters[id] ??= { friendship: 0, storyFlags: [] };
+      data.characters[id].friendship += 1;
+      storyFlag(data, 'talk:' + id);
+    });
+    notify('Uma conversa tranquila também faz parte da jornada.');
+  },
+  claimQuest(id: string) {
+    let claimed = false;
+    commit(data => { claimed = claimQuestReward(data, id); });
+    notify(claimed ? 'Missão concluída. A clareira se lembra do que você fez.' : 'Ainda falta um pequeno passo nessa missão.');
   },
   eatItem(id: ItemId) {
     const { data, ready, fatal } = gameStore.getState();
