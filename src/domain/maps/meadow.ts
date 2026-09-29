@@ -42,6 +42,11 @@ objects.push(
  {id:'fern-gold-tree',kind:'goldTree',x:1380,y:300,scale:1.05,areaId:'fern-grove',solid:{type:'ellipse',x:1380,y:300,radiusX:29,radiusY:23}},
  {id:'fern-pine',kind:'pine',x:955,y:330,scale:.9,areaId:'fern-grove',solid:{type:'ellipse',x:955,y:330,radiusX:24,radiusY:20}}
 );
+objects.push(
+ {id:'npc-lia',kind:'npc',x:1030,y:1370,scale:.9,solid:{type:'ellipse',x:1030,y:1370,radiusX:25,radiusY:18},interaction:{name:'Lia',description:'Jardineira da clareira.',approach:point(1080,1420)}},
+ {id:'npc-bento',kind:'npc',x:1320,y:930,scale:.9,solid:{type:'ellipse',x:1320,y:930,radiusX:25,radiusY:18},interaction:{name:'Bento',description:'Guardião das trilhas.',approach:point(1370,980)}},
+ {id:'npc-nina',kind:'npc',x:780,y:1510,scale:.9,solid:{type:'ellipse',x:780,y:1510,radiusX:25,radiusY:18},interaction:{name:'Nina',description:'Cozinheira da clareira.',approach:point(830,1560)}}
+);
 // Keep the entrance legible instead of covering the new clearing with decorative forest.
 for(let i=objects.length-1;i>=0;i--)if(objects[i].id.startsWith('forest-')&&objects[i].x>920&&objects[i].x<1450&&objects[i].y<670)objects.splice(i,1);
 const gate=objects.find(o=>o.id==='old-gate')!;
