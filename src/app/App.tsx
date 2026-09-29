@@ -93,10 +93,9 @@ export function App() {
 
     <section className="bottom-ui" aria-label="Controles do jogo">
       {saveStatus === 'error' && <div className="save-warning" role="alert">O salvamento está indisponível. Mantenha o jogo aberto até aparecer “Progresso salvo”.</div>}
-      {!state.selectedId && <div className="explore-hint">Dois toques para limpar · um toque para cultivar</div>}
       <nav className="toolbar" aria-label="Menu do jogo">
         <button className="tool" onClick={() => open('inventory')}><span className="tool-icon"><Icon name="backpack" size={23} /></span><span>Mochila</span></button>
-        <button className="tool farm-shortcut" onClick={() => focusResource(PLOTS[0].id)}><span className="tool-icon"><Icon name="sprout" size={22}/></span><span>Horta</span></button><div className="save-indicator"><span><Icon name={saveStatus === 'saved' ? 'check' : 'help'} size={12} />{saveStatus === 'saved' ? 'Progresso salvo' : 'Aguardando salvamento'}</span><small>aventure-se · cultive</small></div>
+        <button className="tool farm-shortcut" onClick={() => focusResource(PLOTS[0].id)}><span className="tool-icon"><Icon name="sprout" size={22}/></span><span>Horta</span></button>
         <button className="tool" onClick={() => open('settings')}><span className="tool-icon"><Icon name="settings" size={22} /></span><span>Ajustes</span></button>
       </nav>
     </section>
