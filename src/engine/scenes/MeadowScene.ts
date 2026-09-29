@@ -66,12 +66,12 @@ export class MeadowScene extends Phaser.Scene {
     this.input.addPointer(1);
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
       this.gesture.lastX = pointer.x; this.gesture.lastY = pointer.y;
-      const active = this.input.manager.pointers.filter(p => p.isDown);
+      const active = this.input.manager.pointers.filter((p: Phaser.Input.Pointer) => p.isDown);
       if (active.length >= 2) this.gesture.pinchDistance = Phaser.Math.Distance.Between(active[0].x, active[0].y, active[1].x, active[1].y);
     });
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
       if (!pointer.isDown || document.querySelector('dialog[open]')) return;
-      const active = this.input.manager.pointers.filter(p => p.isDown);
+      const active = this.input.manager.pointers.filter((p: Phaser.Input.Pointer) => p.isDown);
       if (active.length >= 2) {
         const distance = Phaser.Math.Distance.Between(active[0].x, active[0].y, active[1].x, active[1].y);
         if (this.gesture.pinchDistance > 0 && distance > 0) {
