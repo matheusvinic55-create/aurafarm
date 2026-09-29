@@ -18,7 +18,7 @@ const objects:SceneryObject[]=[
 [[610,1490,.8],[1000,690,.7],[1580,910,.9],[1760,1640,1],[930,1770,.55],[1480,1470,.65]].forEach(([x,y,scale],i)=>objects.push({id:`stone-${i}`,kind:'rock',x,y,scale,solid:{type:'ellipse',x,y,radiusX:36*scale,radiusY:27*scale},interaction:{name:'Pedra do campo',description:'O caminho faz uma pequena curva por aqui.',approach:point(x+65,y+60)}}));
 // A finite forest buffer fills the camera bounds, outside the walkable polygon.
 for(let i=0;i<110;i++){const a=i*2.399963,r=920+(i%4)*85;objects.push({id:`forest-${i}`,kind:i%4===0?'pine':i%9===0?'goldTree':'tree',x:1200+Math.cos(a)*r,y:1210+Math.sin(a)*r*.98,scale:1.1+(i%5)*.12});}
-[[680,990],[770,1840],[1350,730],[1750,1470],[1530,1890],[970,1430],[1290,1340],[650,1540]].forEach(([x,y],i)=>objects.push({id:`flowers-${i}`,kind:'flowers',x,y,scale:.7+(i%3)*.15}));
+[[680,990],[770,1840],[1350,730],[1750,1470],[1530,1890],[760,1450],[1290,1340],[650,1540]].forEach(([x,y],i)=>objects.push({id:`flowers-${i}`,kind:'flowers',x,y,scale:.7+(i%3)*.15}));
 [[680,1200],[1540,770],[830,1870],[1770,1520],[880,650],[1280,610],[1040,600]].forEach(([x,y],i)=>objects.push({id:`shrub-${i}`,kind:'bush',x,y,scale:1,solid:{type:'ellipse',x,y,radiusX:35,radiusY:24}}));
 // Stable instance IDs survive map edits and save migrations.
 const removables:Record<string,SceneryObject['obstacleType']>={
